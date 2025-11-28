@@ -1,0 +1,17 @@
+# configs/asr.yaml
+
+asr:
+  model_name: "small"
+  device: "cuda"          # "cuda" or "cpu"
+  compute_type: "int8"    # "int8", "float16", etc.
+  beam_size: 5
+  language: null          # null = auto-detect
+  task: "transcribe"      # or "translate"
+
+output:
+  transcript_filename: "transcript_segments.json"
+
+postprocessing:
+  strip_text: true
+  merge_short_segments: false
+  min_segment_duration: 0.0

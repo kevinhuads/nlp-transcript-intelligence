@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multimodal-nlp-video"
+version = "0.1.0"
+description = "Multimodal NLP pipeline for videos: ASR, OCR, alignment and summarisation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+authors = [
+  { name = "Kevin Hua", email = "kevin.hua.ds@gmail.com" }
+]
+
+dependencies = [
+  "moviepy>=2.0.0",
+  "tqdm>=4.66.0",
+  "faster-whisper>=1.0.0",
+  "pytesseract>=0.3.10",
+  "pillow>=10.0.0",
+  "transformers>=4.40.0",
+  "sentencepiece>=0.1.99",
+  "PyYAML>=6.0.1"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+  "black>=24.0",
+  "ruff>=0.4.0"
+]
+
+[tool.setuptools]
+# The package you are importing from is literally called "src"
+# (for example: `import src.ingest`), so it is declared as the package here.
+packages = ["src"]

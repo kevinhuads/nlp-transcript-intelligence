@@ -1,0 +1,18 @@
+# configs/summarisation.yaml
+
+summarisation:
+  model_name: "facebook/bart-large-cnn"
+  device: 0              # -1 for CPU, 0 for first GPU
+  max_chunk_chars: 3000
+  max_length: 500        # max tokens in output per chunk
+  min_length: 40         # min tokens in output per chunk
+  do_sample: false
+
+levels:
+  enable_segment_summaries: false
+  enable_chapter_summaries: false
+  enable_global_summary: true
+
+output:
+  global_summary_filename: "global_summary.txt"
+  # if you later store JSON with multi-level summaries, configure here

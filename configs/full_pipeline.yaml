@@ -1,0 +1,23 @@
+# configs/full_example.yaml
+
+include:
+  - project_example.yaml
+  - ingest.yaml
+  - asr.yaml
+  - ocr.yaml
+  - align.yaml
+  - summarise.yaml
+
+# Optional pipeline-specific overrides
+pipeline:
+  steps:
+    - inspect_video
+    - extract_audio
+    - extract_frames
+    - asr
+    - ocr
+    - align
+    - summarise
+
+  fail_fast: true
+  retry_failed_steps: false

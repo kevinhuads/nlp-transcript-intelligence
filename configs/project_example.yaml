@@ -1,0 +1,30 @@
+# configs/project_example.yaml
+
+run:
+  run_name: "example_video_run_001"
+  seed: 3
+
+paths:
+  project_root: "c:/Users/kevin/OneDrive/Documents/Work/Python/NLP-Videos"
+  input_video: "${paths.project_root}/input.mp4"
+  output_dir: "${paths.project_root}/data_example_video"
+
+devices:
+  asr_device: "cuda"
+  summariser_device: 0      # -1 for CPU
+  asr_compute_type: "int8"  # faster-whisper compute_type
+
+logging:
+  level: "INFO"
+  log_to_file: true
+  log_file: "${paths.output_dir}/pipeline.log"
+
+pipeline:
+  steps:
+    - inspect_video
+    - extract_audio
+    - extract_frames
+    - asr
+    - ocr
+    - align
+    - summarise

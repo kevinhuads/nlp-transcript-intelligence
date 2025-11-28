@@ -1,0 +1,22 @@
+# configs/ocr.yaml
+
+ocr:
+  # Must match the frame extraction interval used in ingest
+  frame_interval_seconds: 3
+
+  # Run OCR on every nth frame
+  ocr_frame_stride: 2
+
+  # Tesseract configuration
+  tesseract_cmd: null        # set to full path on Windows if needed
+  lang: "eng"
+  psm: 6                     # page segmentation mode
+  oem: 3                     # engine mode
+
+  # Optional pre-processing
+  preprocess:
+    to_grayscale: false
+    thresholding: false
+
+output:
+  ocr_frames_filename: "ocr_frames.json"

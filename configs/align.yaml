@@ -1,0 +1,12 @@
+# configs/alignment.yaml
+
+alignment:
+  strategy: "nearest_time"     # currently nearest timestamp
+  max_time_diff_seconds: null  # optional: ignore OCR if too far in time
+
+  # If later you introduce bidirectional windows or other heuristics,
+  # they can be configured here.
+  allow_empty_slide_text: true
+
+output:
+  segments_filename: "segments.json"

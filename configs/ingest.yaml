@@ -1,0 +1,16 @@
+# configs/ingest.yaml
+
+ingest:
+  frame_interval_seconds: 3         # same as in your notebook
+  max_video_duration_seconds: null  # optional safety cap; null = no cap
+  video_extensions: [".mp4", ".mov", ".mkv"]
+
+audio:
+  output_filename: "audio.wav"
+  codec: "pcm_s16le"   # moviepy will infer; here only for documentation
+  sample_rate: 16000   # target sample rate if resampling later
+
+frames:
+  directory_name: "frames"
+  filename_pattern: "frame_{index:05d}.jpg"
+  jpeg_quality: 95
