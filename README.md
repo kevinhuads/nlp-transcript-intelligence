@@ -1,4 +1,4 @@
-# NLP Video Pipeline (WIP)
+# NLP Video Pipeline
 
 This repository contains the early version of a multimodal NLP pipeline for videos.  
 Starting from a raw video file, the pipeline extracts audio and frames, runs ASR and OCR, aligns speech with slide text, and produces a global textual summary.
@@ -56,6 +56,14 @@ The relevant part of the repository currently looks like:
 
 ```text
 .
+├── configs/
+│   ├── align.yaml
+│   ├── asr.yaml
+│   ├── full_pipeline.yaml
+│   ├── ingest.yaml
+│   ├── ocr.yaml
+│   ├── project_example.yaml
+│   └── summarise.yaml
 ├── src/
 │   ├── __init__.py
 │   ├── align.py
@@ -76,6 +84,8 @@ The relevant part of the repository currently looks like:
     ├── test_ocr.py
     └── test_summarise.py
 ```
+
+The `configs/` directory in the repository root contains example YAML configuration files for individual stages of the pipeline (`align.yaml`, `asr.yaml`, `ingest.yaml`, `ocr.yaml`, `summarise.yaml`), a combined configuration for the full pipeline (`full_pipeline.yaml`), and a project level example (`project_example.yaml`). These files can be used as starting points for structured configuration of the CLI or for integrating the pipeline into larger projects.
 
 ---
 
