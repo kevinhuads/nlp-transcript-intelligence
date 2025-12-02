@@ -71,7 +71,7 @@ def run_full_pipeline(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Multimodal NLP pipeline: video → audio, frames, ASR, OCR, alignment, summary.",
+        description="Multimodal NLP pipeline: video -> audio, frames, ASR, OCR, alignment, summary.",
     )
     parser.add_argument(
         "--video-path",

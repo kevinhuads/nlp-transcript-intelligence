@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict
 from typing import Optional, List, Dict, Any
+import os
 
 
 @dataclass
@@ -64,6 +65,42 @@ class Segment:
             slide_time=data.get("slide_time"),
             slide_frame=data.get("slide_frame"),
         )
+
+
+# NEW: structured summary models
+
+@dataclass
+class SummaryChunk:
+    chunk_index: int
+    num_chars: int
+    summary: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class VideoSummary:
+    video_id: str
+    video_path: str
+    output_dir: str
+    generated_at: str
+    model_name: str
+    parameters: Dict[str, Any]
+    stats: Dict[str, Any]
+    summary_text: str
+    chunks: List[SummaryChunk]
+
+    def to_dict(self) -> Dict[str, Any]:
+        data = asdict(self)
+        data["chunks"] = [chunk.to_dict() for chunk in self.chunks]
+        return data
+
+    @staticmethod
+    def default_video_id(video_path: str) -> str:
+        base = os.path.basename(video_path)
+        name, _ = os.path.splitext(base)
+        return name
 
 
 def segments_to_jsonable(items: List[Segment]) -> List[Dict[str, Any]]:

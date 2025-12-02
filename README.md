@@ -1,7 +1,7 @@
 # NLP Video Pipeline
 
 This repository contains the early version of a multimodal NLP pipeline for videos.  
-Starting from a raw video file, the pipeline extracts audio and frames, runs ASR and OCR, aligns speech with slide text, and produces a global textual summary.
+Starting from a raw video file, the pipeline extracts audio and frames, runs ASR and OCR, aligns speech with slide text, and produces both a global textual summary and a structured summary artefact.
 
 The project is in its initial stages and is designed to be extended and refactored over time. The current focus is on having a clear, testable core pipeline that can be built upon.
 
@@ -33,8 +33,12 @@ At the moment, the project provides:
 6. **Summarisation**
    - Uses a Hugging Face `transformers` summarization pipeline.
    - Splits the transcript into chunks and produces a global textual summary.
+   - Provides a programmatic helper that computes a global summary and writes a structured summary artefact (`summary.json`) containing:
+     - Global summary text.
+     - Simple statistics (number of segments, chunks, character counts).
+     - Per-chunk summaries and metadata.
 
-All of the above are orchestrated via a single pipeline entry point.
+All of the above are orchestrated via a single pipeline entry point, and the individual stages can also be called from Python.
 
 ---
 
@@ -45,6 +49,7 @@ This is a **work in progress** and currently focuses on:
 - Establishing a clean modular structure under `src/`.
 - Ensuring each step is individually testable.
 - Having a basic end to end flow run via a command line interface.
+- Beginning to persist derived artefacts in structured form to enable downstream tasks (for example search, RAG, and analytics).
 
 Expect breaking changes as the project evolves. The API and CLI are not considered stable yet.
 
@@ -153,7 +158,12 @@ Make sure both are installed and accessible in your `PATH`.
 The current CLI entry point is `src.main`. From the project root, run:
 
 ```bash
-python -m src.main   --video-path path/to/input_video.mp4   --output-dir path/to/output_dir   --frame-interval-seconds 3   --ocr-frame-stride 2   --summariser-device 0
+python -m src.main \
+  --video-path path/to/input_video.mp4 \
+  --output-dir path/to/output_dir \
+  --frame-interval-seconds 3 \
+  --ocr-frame-stride 2 \
+  --summariser-device 0
 ```
 
 Arguments:
@@ -183,7 +193,7 @@ The CLI internally calls:
 - `align_transcript_and_ocr` and `preview_segments`
 - `summarise_segments`
 
-and prints progress to the console.
+and prints progress to the console. The global summary is printed to stdout.
 
 ### 2. Expected output structure
 
@@ -216,7 +226,14 @@ OUT_DIR/
 - `segments.json`  
   Aligned multimodal segments, combining transcript and nearest OCR text.
 
-The global summary is printed to stdout by `summarise_segments`. Later versions may additionally write it to a file.
+When using the structured summarisation helper from Python (see below), an additional artefact is created:
+
+```text
+OUT_DIR/
+└── summary.json
+```
+
+`summary.json` contains the global summary text together with basic statistics and per-chunk summaries.
 
 ---
 
@@ -270,7 +287,7 @@ from src.ingest import inspect_video, extract_audio, extract_frames
 from src.asr import run_asr, preview_transcript
 from src.ocr import run_ocr_on_frames, preview_ocr
 from src.align import align_transcript_and_ocr, preview_segments
-from src.summarise import summarise_segments
+from src.summarise import summarise_segments, summarise_segments_and_save
 
 video_path = "path/to/video.mp4"
 output_dir = "path/to/output"
@@ -304,7 +321,8 @@ segments_merged = align_transcript_and_ocr(
 )
 preview_segments(segments_merged, n=5)
 
-summary = summarise_segments(
+# Global summary printed to stdout and returned as a string
+summary_text = summarise_segments(
     segments_merged,
     model_name="facebook/bart-large-cnn",
     device=0,
@@ -312,8 +330,33 @@ summary = summarise_segments(
     max_length=500,
     min_length=40,
 )
-print(summary)
+print(summary_text)
+
+# Structured summary persisted to summary.json
+video_summary = summarise_segments_and_save(
+    segments=segments_merged,
+    video_path=video_path,
+    output_dir=output_dir,
+    model_name="facebook/bart-large-cnn",
+    device=0,
+    max_chunk_chars=3000,
+    max_length=500,
+    min_length=40,
+)
+
+print(video_summary.video_id)
+print(video_summary.stats)
 ```
+
+The `summarise_segments_and_save` helper computes a global summary, derives simple statistics, and writes a `summary.json` file in `output_dir`. It returns a `VideoSummary` object that contains:
+
+- `video_id`, `video_path`, `output_dir`
+- `generated_at`, `model_name`
+- `parameters` used for summarisation
+- `stats` about the input and output text
+- `summary_text` and a list of `SummaryChunk` objects
+
+This structured artefact is intended for downstream tasks such as search, RAG, evaluation, or analytics.
 
 ---
 
@@ -355,5 +398,3 @@ This repository is intended to grow into a richer toolkit for video understandin
 - More comprehensive logging, metrics, and monitoring.
 
 Since this is an early stage project, the actual roadmap may change significantly as the codebase evolves.
-
----

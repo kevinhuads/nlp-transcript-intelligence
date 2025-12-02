@@ -12,11 +12,10 @@ def test_inspect_video_file_not_found(tmp_path):
         inspect_video(video_path)
 
 
-def test_inspect_video_happy_path(tmp_path, monkeypatch, capsys):
+def test_inspect_video_happy_path(tmp_path, monkeypatch):
     base_dir = str(tmp_path)
     video_path = os.path.join(base_dir, "video.mp4")
 
-    # Real file for the existence check
     with open(video_path, "wb") as f:
         f.write(b"\x00" * 10)
 
@@ -39,12 +38,15 @@ def test_inspect_video_happy_path(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("src.ingest.VideoFileClip", DummyClip)
     monkeypatch.setattr("src.ingest.os.path.getsize", fake_getsize)
 
-    inspect_video(video_path)
-    out = capsys.readouterr().out
-    assert "Found video file: video.mp4" in out
-    assert "Size: 5.00 MB" in out
-    assert "Duration: 120.00 seconds" in out
-    assert "Frame rate (fps): 30.0" in out
+    info = inspect_video(video_path)
+
+    assert info["filename"] == "video.mp4"
+    assert info["path"] == video_path
+    assert info["size_mb"] == 5.00
+    assert info["duration_seconds"] == 120.00
+    assert info["duration_minutes"] == 2.00
+    assert info["fps"] == 30.0
+
 
 
 def test_extract_audio_returns_early_if_audio_exists(tmp_path, monkeypatch):
