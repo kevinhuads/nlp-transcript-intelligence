@@ -99,7 +99,7 @@ The `configs/` directory in the repository root contains example YAML configurat
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repo-url>.git
+git clone https://github.com/kevinhuads/nlp-transcript-intelligence.git
 cd NLP-Videos
 ```
 
@@ -117,7 +117,7 @@ python -m venv .venv
 
 ### 3. Install Python dependencies
 
-Install using your preferred tool (for example `pip`). The exact versions should be defined in `pyproject.toml` or `requirements.txt`.
+Install using a preferred tool (for example `pip`). The exact versions should be defined in `pyproject.toml` or `requirements.txt`.
 
 Typical runtime dependencies include (non exhaustive):
 
@@ -135,7 +135,7 @@ Example:
 pip install -r requirements.txt
 ```
 
-or, if you are using a `pyproject.toml`, follow your chosen build tool (for example `poetry install`).
+or, when using a `pyproject.toml`, follow the chosen build tool (for example `poetry install`).
 
 ### 4. System dependencies
 
@@ -147,7 +147,7 @@ Some components require system level tools.
 - **Tesseract OCR**  
   Required by `pytesseract` for running OCR on frames.
 
-Make sure both are installed and accessible in your `PATH`.
+Make sure both are installed and accessible in the `PATH`.
 
 ---
 
@@ -254,13 +254,13 @@ From the project root, the application can be started with:
 streamlit run src/app.py
 ```
 
-Adjust the path if your Streamlit entry point lives under a different filename or package. The application manages per session artefacts under a configurable output directory and keeps intermediate results in Streamlit session state so that each tab can build upon previous steps.
+Adjust the path if the Streamlit entry point lives under a different filename or package. The application manages per session artefacts under a configurable output directory and keeps intermediate results in Streamlit session state so that each tab can build upon previous steps.
 
 ---
 
 ## Python API
 
-You can also call the pipeline directly from Python code.
+It is also possible to call the pipeline directly from Python code.
 
 ### Full pipeline
 
