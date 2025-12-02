@@ -6,7 +6,7 @@ from PIL import Image
 from tqdm import tqdm
 
 
-def inspect_video(video_path: str) -> None:
+def inspect_video(video_path: str) -> dict:
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
@@ -17,10 +17,15 @@ def inspect_video(video_path: str) -> None:
         duration = clip.duration
         fps = clip.fps
 
-    print(f"Found video file: {os.path.basename(video_path)}")
-    print(f"Size: {file_size_mb:.2f} MB")
-    print(f"Duration: {duration:.2f} seconds ({duration / 60:.2f} minutes)")
-    print(f"Frame rate (fps): {fps}")
+    # Return metadata instead of printing it
+    return {
+        "filename": os.path.basename(video_path),
+        "path": video_path,
+        "size_mb": round(file_size_mb, 2),
+        "duration_seconds": round(duration, 2),
+        "duration_minutes": round(duration / 60, 2),
+        "fps": fps,
+    }
 
 
 def extract_audio(video_path: str, audio_path: str) -> None:

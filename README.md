@@ -59,6 +59,7 @@ The relevant part of the repository currently looks like:
 ├── src/
 │   ├── __init__.py
 │   ├── align.py
+│   ├── app.py                # Streamlit UI (interactive web interface)
 │   ├── asr.py
 │   ├── ingest.py
 │   ├── main.py
@@ -142,12 +143,7 @@ Make sure both are installed and accessible in your `PATH`.
 The current CLI entry point is `src.main`. From the project root, run:
 
 ```bash
-python -m src.main \
-  --video-path path/to/input_video.mp4 \
-  --output-dir path/to/output_dir \
-  --frame-interval-seconds 3 \
-  --ocr-frame-stride 2 \
-  --summariser-device 0
+python -m src.main   --video-path path/to/input_video.mp4   --output-dir path/to/output_dir   --frame-interval-seconds 3   --ocr-frame-stride 2   --summariser-device 0
 ```
 
 Arguments:
@@ -211,6 +207,27 @@ OUT_DIR/
   Aligned multimodal segments, combining transcript and nearest OCR text.
 
 The global summary is printed to stdout by `summarise_segments`. Later versions may additionally write it to a file.
+
+---
+
+## Streamlit application
+
+In addition to the CLI, the repository provides an interactive web interface built with Streamlit. This application exposes the same stages of the pipeline through a set of tabs:
+
+- **Inspect**: video or audio metadata preview and media playback.
+- **Ingest**: extraction of audio and frames from video input.
+- **ASR**: running speech recognition and previewing transcript segments.
+- **OCR**: running OCR on sampled frames and previewing OCR records.
+- **Align**: aligning ASR segments with OCR timestamps.
+- **Summarise**: generating a global textual summary from aligned or ASR-only segments, or directly from text input.
+
+From the project root, the application can be started with:
+
+```bash
+streamlit run src/app.py
+```
+
+Adjust the path if your Streamlit entry point lives under a different filename or package. The application manages per session artefacts under a configurable output directory and keeps intermediate results in Streamlit session state so that each tab can build upon previous steps.
 
 ---
 
@@ -323,7 +340,7 @@ This repository is intended to grow into a richer toolkit for video understandin
 - Better management of summarisation models and task specific prompts.
 - Richer alignment strategies between speech and visual content.
 - Metadata export in formats suitable for search and indexing.
-- Web or desktop UI for running the pipeline and browsing results.
+- Extension of the Streamlit web UI and exploration of alternative UI frontends.
 - Performance optimisations, batching, and distributed processing.
 - More comprehensive logging, metrics, and monitoring.
 
