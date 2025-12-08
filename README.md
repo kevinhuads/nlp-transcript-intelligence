@@ -72,7 +72,7 @@ The relevant part of the repository currently looks like:
 ├── src/
 │   ├── __init__.py
 │   ├── align.py
-│   ├── app.py                # Streamlit UI (interactive web interface)
+│   ├── app.py
 │   ├── asr.py
 │   ├── ingest.py
 │   ├── main.py
@@ -287,7 +287,7 @@ from src.ingest import inspect_video, extract_audio, extract_frames
 from src.asr import run_asr, preview_transcript
 from src.ocr import run_ocr_on_frames, preview_ocr
 from src.align import align_transcript_and_ocr, preview_segments
-from src.summarise import summarise_segments, summarise_segments_and_save
+from src.summarise import summarise_segments
 
 video_path = "path/to/video.mp4"
 output_dir = "path/to/output"
@@ -333,7 +333,7 @@ summary_text = summarise_segments(
 print(summary_text)
 
 # Structured summary persisted to summary.json
-video_summary = summarise_segments_and_save(
+video_summary = summarise_segments(
     segments=segments_merged,
     video_path=video_path,
     output_dir=output_dir,
