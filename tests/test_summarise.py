@@ -1,4 +1,4 @@
-from src.summarise import _chunk_text, summarise_segments, summarise_segments_and_save
+from src.summarise import _chunk_text, summarise_segments
 from src.models import Segment
 import json
 
@@ -91,7 +91,7 @@ def test_summarise_segments_calls_pipeline_for_each_chunk(monkeypatch, capsys):
     assert "SUMMARY:" in summary
 
 
-def test_summarise_segments_and_save_writes_summary_json(tmp_path, monkeypatch):
+def test_summarise_segments_writes_summary_json(tmp_path, monkeypatch):
     calls = []
 
     class DummySummariser:
@@ -133,7 +133,8 @@ def test_summarise_segments_and_save_writes_summary_json(tmp_path, monkeypatch):
     out_dir = tmp_path / "out"
     out_dir.mkdir()
 
-    summary_obj = summarise_segments_and_save(
+    # Trigger JSON saving by passing summary_filename
+    summary = summarise_segments(
         segments=segments,
         video_path="example_video.mp4",
         output_dir=str(out_dir),
@@ -142,22 +143,23 @@ def test_summarise_segments_and_save_writes_summary_json(tmp_path, monkeypatch):
         max_chunk_chars=30,
         max_length=50,
         min_length=10,
+        summary_filename="summary.json",
     )
 
-    # Ensure the structured object looks reasonable
-    assert summary_obj.video_id == "example_video"
-    assert summary_obj.summary_text.startswith("SUMMARY:")
-    assert summary_obj.stats["num_segments"] == len(segments)
+    # The function still returns the global summary string
+    assert isinstance(summary, str)
+    assert summary.startswith("SUMMARY:")
 
-    # Check that the file was written
+    # Check that the file was written with the default name
     summary_path = out_dir / "summary.json"
     assert summary_path.exists()
 
     with summary_path.open("r", encoding="utf-8") as f:
         data = json.load(f)
 
+    # Ensure the structured content looks reasonable
     assert data["video_id"] == "example_video"
-    assert "summary_text" in data
-    assert "stats" in data
+    assert data["summary_text"].startswith("SUMMARY:")
+    assert data["stats"]["num_segments"] == len(segments)
     assert "chunks" in data
     assert len(data["chunks"]) >= 1
