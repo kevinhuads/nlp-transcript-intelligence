@@ -1,0 +1,29 @@
+{
+  "models": {
+    "distil-large-v3": {
+      "corpus_wer": 0.05367839488223321,
+      "mean_item_wer": 0.06173894368021025,
+      "total_substitutions": 2248,
+      "total_deletions": 268,
+      "total_insertions": 253,
+      "total_ref_words": 51585,
+      "total_asr_seconds": 1455.1503748893738,
+      "items": 2864,
+      "settings": {
+        "model_key": "distil-large-v3",
+        "backend": "faster_whisper",
+        "name": "distil-large-v3",
+        "dataset": "dev-other",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

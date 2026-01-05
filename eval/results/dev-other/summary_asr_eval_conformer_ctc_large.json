@@ -1,0 +1,29 @@
+{
+  "models": {
+    "conformer_ctc_large": {
+      "corpus_wer": 0.043656101579916645,
+      "mean_item_wer": 0.04884240687063154,
+      "total_substitutions": 1880,
+      "total_deletions": 184,
+      "total_insertions": 188,
+      "total_ref_words": 51585,
+      "total_asr_seconds": 145.08374762535095,
+      "items": 2864,
+      "settings": {
+        "model_key": "conformer_ctc_large",
+        "backend": "nemo",
+        "name": "stt_en_conformer_ctc_large",
+        "dataset": "dev-other",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

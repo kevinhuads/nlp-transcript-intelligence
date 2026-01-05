@@ -1,0 +1,27 @@
+{
+  "models": {
+    "medium": {
+      "corpus_wer": 0.0686439856547446,
+      "mean_item_wer": 0.07887986544259121,
+      "total_substitutions": 2795,
+      "total_deletions": 371,
+      "total_insertions": 375,
+      "total_ref_words": 51585,
+      "total_asr_seconds": 1768.10063123703,
+      "items": 2864,
+      "settings": {
+        "model": "medium",
+        "model_id": "medium",
+        "dataset": "dev-other",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false
+      }
+    }
+  }
+}

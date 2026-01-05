@@ -1,0 +1,29 @@
+{
+  "models": {
+    "jasper10x5dr": {
+      "corpus_wer": 0.1021808665309683,
+      "mean_item_wer": 0.10740498734743806,
+      "total_substitutions": 4308,
+      "total_deletions": 586,
+      "total_insertions": 377,
+      "total_ref_words": 51585,
+      "total_asr_seconds": 115.20852637290955,
+      "items": 2864,
+      "settings": {
+        "model_key": "jasper10x5dr",
+        "backend": "nemo",
+        "name": "stt_en_jasper10x5dr",
+        "dataset": "dev-other",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

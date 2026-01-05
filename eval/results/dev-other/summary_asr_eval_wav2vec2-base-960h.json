@@ -1,0 +1,29 @@
+{
+  "models": {
+    "wav2vec2-base-960h": {
+      "corpus_wer": 0.08863041581855191,
+      "mean_item_wer": 0.09679182850803969,
+      "total_substitutions": 3821,
+      "total_deletions": 414,
+      "total_insertions": 337,
+      "total_ref_words": 51585,
+      "total_asr_seconds": 170.863685131073,
+      "items": 2864,
+      "settings": {
+        "model_key": "wav2vec2-base-960h",
+        "backend": "transformers_pipeline",
+        "name": "facebook/wav2vec2-base-960h",
+        "dataset": "dev-other",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

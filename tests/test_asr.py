@@ -30,7 +30,7 @@ def test_run_asr_uses_cached_transcript_if_exists(tmp_path, monkeypatch, capsys)
     segments = run_asr(
         audio_path=audio_path,
         transcript_path=transcript_path,
-        model_size="tiny",
+        model_id="large-v3-turbo",
         device="cpu",
         compute_type="int8",
     )
@@ -50,7 +50,6 @@ def test_run_asr_creates_transcript_when_missing(tmp_path, monkeypatch):
     audio_path = os.path.join(base_dir, "audio.wav")
     transcript_path = os.path.join(base_dir, "out", "segments.json")
 
-    # Simulate that the audio file exists
     os.makedirs(os.path.dirname(audio_path), exist_ok=True)
     with open(audio_path, "wb") as f:
         f.write(b"\x00")
@@ -69,9 +68,11 @@ def test_run_asr_creates_transcript_when_missing(tmp_path, monkeypatch):
             created_model_args["device"] = device
             created_model_args["compute_type"] = compute_type
 
-        def transcribe(self, audio_path_str, beam_size):
+        def transcribe(self, audio_path_str, beam_size=5, language=None, task="transcribe"):
             assert isinstance(audio_path_str, str)
             assert beam_size == 5
+            assert language is None
+            assert task == "transcribe"
             segments_iter = [
                 DummySeg(0.0, 1.0, " first "),
                 DummySeg(1.0, 2.0, " second"),
@@ -83,12 +84,12 @@ def test_run_asr_creates_transcript_when_missing(tmp_path, monkeypatch):
     segments = run_asr(
         audio_path=audio_path,
         transcript_path=transcript_path,
-        model_size="small",
+        model_id="large-v3-turbo",
         device="cuda",
         compute_type="int8",
     )
 
-    assert created_model_args["model_size"] == "small"
+    assert created_model_args["model_size"] == "large-v3-turbo"
     assert created_model_args["device"] == "cuda"
     assert created_model_args["compute_type"] == "int8"
 
@@ -101,9 +102,12 @@ def test_run_asr_creates_transcript_when_missing(tmp_path, monkeypatch):
     assert os.path.exists(transcript_path)
     with open(transcript_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    assert len(data) == 2
-    assert data[0]["text"] == "first"
-    assert data[1]["text"] == "second"
+
+    assert isinstance(data, dict)
+    assert "segments" in data
+    assert len(data["segments"]) == 2
+    assert data["segments"][0]["text"] == "first"
+    assert data["segments"][1]["text"] == "second"
 
 
 def test_preview_transcript_prints_expected_format(capsys):

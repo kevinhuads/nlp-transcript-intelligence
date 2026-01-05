@@ -1,0 +1,29 @@
+{
+  "models": {
+    "mms-1b-all": {
+      "corpus_wer": 0.08223320732771154,
+      "mean_item_wer": 0.09204330157945399,
+      "total_substitutions": 3605,
+      "total_deletions": 334,
+      "total_insertions": 303,
+      "total_ref_words": 51585,
+      "total_asr_seconds": 227.68161535263062,
+      "items": 2864,
+      "settings": {
+        "model_key": "mms-1b-all",
+        "backend": "mms",
+        "name": "facebook/mms-1b-all",
+        "dataset": "dev-other",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

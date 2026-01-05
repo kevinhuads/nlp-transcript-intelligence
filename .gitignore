@@ -103,3 +103,6 @@ uploaded_audio/
 uploaded_videos/
 finevideo/
 data/
+eval/results/
+eval/manifests/
+mlruns/

@@ -1,0 +1,27 @@
+{
+  "models": {
+    "tiny.en": {
+      "corpus_wer": 0.061808907915110664,
+      "mean_item_wer": 0.07564036631313795,
+      "total_substitutions": 2544,
+      "total_deletions": 372,
+      "total_insertions": 477,
+      "total_ref_words": 54895,
+      "total_asr_seconds": 798.994083404541,
+      "items": 2703,
+      "settings": {
+        "model": "tiny.en",
+        "model_id": "tiny.en",
+        "dataset": "dev-clean",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false
+      }
+    }
+  }
+}

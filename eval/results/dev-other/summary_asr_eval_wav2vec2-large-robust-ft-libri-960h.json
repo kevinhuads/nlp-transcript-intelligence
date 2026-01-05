@@ -1,0 +1,29 @@
+{
+  "models": {
+    "wav2vec2-large-robust-ft-libri-960h": {
+      "corpus_wer": 0.05265096442764369,
+      "mean_item_wer": 0.05773716229778105,
+      "total_substitutions": 2346,
+      "total_deletions": 178,
+      "total_insertions": 192,
+      "total_ref_words": 51585,
+      "total_asr_seconds": 190.42778754234314,
+      "items": 2864,
+      "settings": {
+        "model_key": "wav2vec2-large-robust-ft-libri-960h",
+        "backend": "transformers_pipeline",
+        "name": "facebook/wav2vec2-large-robust-ft-libri-960h",
+        "dataset": "dev-other",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

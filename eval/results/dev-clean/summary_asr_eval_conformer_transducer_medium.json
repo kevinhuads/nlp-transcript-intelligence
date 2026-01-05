@@ -1,0 +1,29 @@
+{
+  "models": {
+    "conformer_transducer_medium": {
+      "corpus_wer": 0.020657619090991893,
+      "mean_item_wer": 0.024324395285476825,
+      "total_substitutions": 885,
+      "total_deletions": 123,
+      "total_insertions": 126,
+      "total_ref_words": 54895,
+      "total_asr_seconds": 375.8767900466919,
+      "items": 2703,
+      "settings": {
+        "model_key": "conformer_transducer_medium",
+        "backend": "nemo",
+        "name": "stt_en_conformer_transducer_medium",
+        "dataset": "dev-clean",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

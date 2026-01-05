@@ -1,0 +1,29 @@
+{
+  "models": {
+    "wav2vec2-large-960h": {
+      "corpus_wer": 0.0648638170010662,
+      "mean_item_wer": 0.07245657590704496,
+      "total_substitutions": 2798,
+      "total_deletions": 294,
+      "total_insertions": 254,
+      "total_ref_words": 51585,
+      "total_asr_seconds": 186.0520725250244,
+      "items": 2864,
+      "settings": {
+        "model_key": "wav2vec2-large-960h",
+        "backend": "transformers_pipeline",
+        "name": "facebook/wav2vec2-large-960h",
+        "dataset": "dev-other",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "models": {
+    "conformer_transducer_large": {
+      "corpus_wer": 0.03510710477852089,
+      "mean_item_wer": 0.04029466700497083,
+      "total_substitutions": 1476,
+      "total_deletions": 187,
+      "total_insertions": 148,
+      "total_ref_words": 51585,
+      "total_asr_seconds": 685.7837424278259,
+      "items": 2864,
+      "settings": {
+        "model_key": "conformer_transducer_large",
+        "backend": "nemo",
+        "name": "nvidia/stt_en_conformer_transducer_large",
+        "dataset": "dev-other",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

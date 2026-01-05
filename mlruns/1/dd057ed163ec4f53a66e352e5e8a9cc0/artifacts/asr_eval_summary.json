@@ -1,0 +1,23 @@
+{
+  "models": {
+    "medium": {
+      "corpus_wer": 0.06302021403091558,
+      "mean_item_wer": 0.07913725642449623,
+      "total_substitutions": 46,
+      "total_deletions": 4,
+      "total_insertions": 3,
+      "total_ref_words": 841,
+      "total_asr_seconds": 40.23109817504883,
+      "items": 50,
+      "settings": {
+        "device": "cuda",
+        "compute_type": "int8",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "models": {
+    "citrinet_256": {
+      "corpus_wer": 0.042371800710447216,
+      "mean_item_wer": 0.048624852907824354,
+      "total_substitutions": 1912,
+      "total_deletions": 212,
+      "total_insertions": 202,
+      "total_ref_words": 54895,
+      "total_asr_seconds": 157.5663616657257,
+      "items": 2703,
+      "settings": {
+        "model_key": "citrinet_256",
+        "backend": "nemo",
+        "name": "stt_en_citrinet_256",
+        "dataset": "dev-clean",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

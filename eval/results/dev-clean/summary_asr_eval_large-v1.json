@@ -1,0 +1,27 @@
+{
+  "models": {
+    "large-v1": {
+      "corpus_wer": 0.029693050368886056,
+      "mean_item_wer": 0.03836387559412638,
+      "total_substitutions": 1241,
+      "total_deletions": 265,
+      "total_insertions": 124,
+      "total_ref_words": 54895,
+      "total_asr_seconds": 2586.77405834198,
+      "items": 2703,
+      "settings": {
+        "model": "large-v1",
+        "model_id": "large-v1",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "dataset": "dev-clean"
+      }
+    }
+  }
+}

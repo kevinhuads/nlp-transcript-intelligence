@@ -384,6 +384,37 @@ Heavy external dependencies (video processing, OCR, large models) are mocked in 
 
 ---
 
+## Evaluation
+
+The repository includes an `eval/` folder with benchmarking utilities. The first implemented benchmark evaluates **ASR quality using WER (Word Error Rate)** on LibriSpeech splits via a YAML-driven runner and multiple ASR backends (faster-whisper, Hugging Face pipelines, NeMo, MMS). The current benchmark results informed the default ASR choice of **Whisper `large-v3-turbo`** as a strong accuracy and throughput tradeoff for the target use case.
+
+### ASR benchmark (WER)
+
+1. Create or provide a LibriSpeech-style manifest CSV under `eval/manifests/` with columns:
+   - `id`, `audio_path`, `ref_text`
+
+2. Run the evaluation script with a config:
+
+```bash
+python eval/asr_eval.py --config eval/configs/asr.yaml
+```
+
+Run a single model:
+
+```bash
+python eval/asr_eval.py --config eval/configs/asr.yaml --model-key large-v3-turbo
+```
+
+### Outputs
+
+Results are written under `eval/results/<dataset>/`:
+
+- `asr_eval_<model>.csv`: per-utterance WER, S/D/I counts, and decoding time.
+- `summary_asr_eval_<model>.json`: corpus-level aggregates (including corpus WER) and the exact settings used.
+
+The analysis notebook `eval/asr_eval_notebook.ipynb` compares models on accuracy, latency, and error profiles.
+
+
 ## Roadmap and ideas for future work
 
 This repository is intended to grow into a richer toolkit for video understanding. Some possible future directions include:

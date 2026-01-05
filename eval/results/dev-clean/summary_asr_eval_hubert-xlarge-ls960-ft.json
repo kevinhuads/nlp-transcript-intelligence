@@ -1,0 +1,29 @@
+{
+  "models": {
+    "hubert-xlarge-ls960-ft": {
+      "corpus_wer": 0.020439019947171875,
+      "mean_item_wer": 0.023481012006737016,
+      "total_substitutions": 923,
+      "total_deletions": 99,
+      "total_insertions": 100,
+      "total_ref_words": 54895,
+      "total_asr_seconds": 180.33770108222961,
+      "items": 2703,
+      "settings": {
+        "model_key": "hubert-xlarge-ls960-ft",
+        "backend": "transformers_pipeline",
+        "name": "facebook/hubert-xlarge-ls960-ft",
+        "dataset": "dev-clean",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

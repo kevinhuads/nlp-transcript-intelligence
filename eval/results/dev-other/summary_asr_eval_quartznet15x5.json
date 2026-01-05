@@ -1,0 +1,29 @@
+{
+  "models": {
+    "quartznet15x5": {
+      "corpus_wer": 0.11344383057090239,
+      "mean_item_wer": 0.12026297648524736,
+      "total_substitutions": 4812,
+      "total_deletions": 613,
+      "total_insertions": 427,
+      "total_ref_words": 51585,
+      "total_asr_seconds": 109.21482920646667,
+      "items": 2864,
+      "settings": {
+        "model_key": "quartznet15x5",
+        "backend": "nemo",
+        "name": "stt_en_quartznet15x5",
+        "dataset": "dev-other",
+        "max_items": null,
+        "device": "cuda",
+        "compute_type": "float16",
+        "language": null,
+        "task": "transcribe",
+        "beam_size": 5,
+        "best_of": 5,
+        "vad_filter": false,
+        "model_params": {}
+      }
+    }
+  }
+}

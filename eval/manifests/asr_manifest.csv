@@ -1,0 +1,3 @@
+id,audio_path,ref_path
+clip_001,data/clip_001.wav,refs/clip_001.txt
+clip_002,data/clip_002.wav,refs/clip_002.txt

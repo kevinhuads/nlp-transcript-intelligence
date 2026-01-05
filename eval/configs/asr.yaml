@@ -1,0 +1,17 @@
+eval_asr:
+  max_items: null
+  dataset: "dev-clean"
+  models: ["stt_en_conformer_transducer_small","stt_en_conformer_transducer_medium","facebook/mms-1b-fl102"]
+  device: "cuda"
+  compute_type: "float16"
+  language: null
+  task: "transcribe"
+  beam_size: 5
+  best_of: 5
+  vad_filter: false
+  output_base_folder: "eval/results"
+  mlflow:
+    enabled: true
+    tracking_uri: null
+    experiment: "asr_eval"
+    nested_per_model: false

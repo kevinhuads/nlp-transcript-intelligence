@@ -1,0 +1,44 @@
+[
+  {"key": "large-v1", "backend": "faster_whisper", "name": "large-v1"},
+  {"key": "large-v3", "backend": "faster_whisper", "name": "large-v3"},
+  {"key": "large-v3-turbo", "backend": "faster_whisper", "name": "large-v3-turbo"},
+
+  {"key": "medium.en", "backend": "faster_whisper", "name": "medium.en"},
+  {"key": "medium", "backend": "faster_whisper", "name": "medium"},
+
+  {"key": "distil-large-v3", "backend": "faster_whisper", "name": "distil-large-v3"},
+
+  {"key": "small.en", "backend": "faster_whisper", "name": "small.en"},
+  {"key": "small", "backend": "faster_whisper", "name": "small"},
+
+  {"key": "base.en", "backend": "faster_whisper", "name": "base.en"},
+  {"key": "base", "backend": "faster_whisper", "name": "base"},
+
+  {"key": "tiny.en", "backend": "faster_whisper", "name": "tiny.en"},
+  {"key": "tiny", "backend": "faster_whisper", "name": "tiny"},
+
+  {"key": "hubert-xlarge", "backend": "transformers_pipeline", "name": "facebook/hubert-xlarge-ls960-ft"},
+  {"key": "hubert-large", "backend": "transformers_pipeline", "name": "facebook/hubert-large-ls960-ft"},
+
+  {"key": "w2v2-large", "backend": "transformers_pipeline", "name": "facebook/wav2vec2-large-960h"},
+  {"key": "w2v2-lv60", "backend": "transformers_pipeline", "name": "facebook/wav2vec2-large-960h-lv60-self"},
+  {"key": "w2v2-robust", "backend": "transformers_pipeline", "name": "facebook/wav2vec2-large-robust-ft-libri-960h"},
+  {"key": "w2v2-base", "backend": "transformers_pipeline", "name": "facebook/wav2vec2-base-960h"},
+
+  {"key": "mms-1b-all-eng", "backend": "mms", "name": "facebook/mms-1b-all", "lang": "eng"},
+
+  {"key": "conformer-ctc-l", "backend": "nemo", "name": "stt_en_conformer_ctc_large"},
+  {"key": "conformer-ctc-m", "backend": "nemo", "name": "stt_en_conformer_ctc_medium"},
+  {"key": "conformer-ctc-s", "backend": "nemo", "name": "stt_en_conformer_ctc_small"},
+
+  {"key": "conformer-transducer-l", "backend": "nemo", "name": "stt_en_conformer_transducer_large"},
+  {"key": "conformer-transducer-m", "backend": "nemo", "name": "stt_en_conformer_transducer_medium"},
+  {"key": "conformer-transducer-s", "backend": "nemo", "name": "stt_en_conformer_transducer_small"},
+
+  {"key": "citrinet-1024", "backend": "nemo", "name": "stt_en_citrinet_1024"},
+  {"key": "citrinet-512", "backend": "nemo", "name": "stt_en_citrinet_512"},
+  {"key": "citrinet-256", "backend": "nemo", "name": "stt_en_citrinet_256"},
+
+  {"key": "jasper10x5dr", "backend": "nemo", "name": "stt_en_jasper10x5dr"},
+  {"key": "quartznet15x5", "backend": "nemo", "name": "stt_en_quartznet15x5"}
+]
