@@ -384,26 +384,23 @@ Heavy external dependencies (video processing, OCR, large models) are mocked in 
 
 ---
 
-## Evaluation
+## Evaluation and benchmarks
 
-The repository includes an `eval/` folder with benchmarking utilities. The first implemented benchmark evaluates **ASR quality using WER (Word Error Rate)** on LibriSpeech splits via a YAML-driven runner and multiple ASR backends (faster-whisper, Hugging Face pipelines, NeMo, MMS). The current benchmark results informed the default ASR choice of **Whisper `large-v3-turbo`** as a strong accuracy and throughput tradeoff for the target use case.
+This repository includes an evaluation suite under `eval/`. Its purpose is to compare multiple ASR backends using a consistent WER (Word Error Rate) methodology, and to make the accuracy versus latency trade-off explicit.
 
-### ASR benchmark (WER)
+### Current ASR benchmark summary
 
-1. Create or provide a LibriSpeech-style manifest CSV under `eval/manifests/` with columns:
-   - `id`, `audio_path`, `ref_text`
+The benchmark is run on two complementary subsets of the same public speech dataset:
+- A subset with relatively clean recordings.
+- A subset with more challenging acoustic conditions.
 
-2. Run the evaluation script with a config:
+Key observations from the current runs:
+- On the clean subset, top-performing English-focused baselines achieve corpus WER in the high 0.01 range (around 0.017 in the best runs).
+- On the harder subset, the best corpus WER in the current runs is in the low 0.03 range (around 0.034 in the best runs).
+- Whisper-family models show a clear throughput trade-off. Faster variants reduce latency substantially but do not lead on this dataset-specific WER ranking. They remain attractive as a general-purpose default when the application must handle broader, open-world audio conditions and multilingual inputs.
 
-```bash
-python eval/asr_eval.py --config eval/configs/asr.yaml
-```
+For details on the dataset splits, manifest format, normalization choices, model list, decoding settings, and the analysis notebook, see `eval/README.md` and `eval/asr_eval_notebook.ipynb`.
 
-Run a single model:
-
-```bash
-python eval/asr_eval.py --config eval/configs/asr.yaml --model-key large-v3-turbo
-```
 
 ### Outputs
 
