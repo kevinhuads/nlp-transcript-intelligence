@@ -1,0 +1,25 @@
+eval_ocr:
+  dataset: "mavils"
+  manifest: "eval/manifests/mavils_ocr_manifest.csv"
+  max_items: null
+
+  device: "cuda"
+  compute_type: "float16"
+
+  normalize:
+    lowercase: true
+    strip_punct: true
+
+  output_base_folder: "eval/results"
+
+  models:
+    - "google_cloud_vision"
+    - "google_document_ai"
+    - "azure_read"
+    - "aws_textract"
+
+
+  mlflow:
+    enabled: false
+    tracking_uri: null
+    experiment: "ocr_eval"

@@ -1,6 +1,7 @@
 # Evaluation
 
 This folder contains evaluation utilities for the project. The first implemented benchmark is **ASR evaluation with WER (Word Error Rate)** on LibriSpeech splits.
+The **OCR evaluation** is still under development.
 
 Workflow:
 
@@ -21,6 +22,7 @@ Workflow:
 - `results/`: outputs by dataset.
 - `write_manifests.py`: generates LibriSpeech manifests from `.trans.txt`.
 - `asr_eval_notebook.ipynb`: analysis and plots.
+- `eval_notebook_utils.py`: utilities for the notebooks.
 
 ---
 

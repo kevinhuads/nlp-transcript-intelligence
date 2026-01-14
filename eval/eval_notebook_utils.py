@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import md5
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+
 import glob
 import os
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -12,139 +14,9 @@ import seaborn as sns
 from matplotlib.patches import Patch
 
 
-### Dataset ###
-
-
-def list_eval_csvs(results_root: str, dataset: str) -> List[str]:
-    pattern = os.path.join(results_root, dataset, "asr_eval_*.csv")
-    paths = sorted(glob.glob(pattern, recursive=False))
-    return [p for p in paths if os.path.getsize(p) > 0]
-
-
-def load_eval_df(results_root: str, dataset: str) -> pd.DataFrame:
-    csv_paths = list_eval_csvs(results_root, dataset)
-    frames = [pd.read_csv(p) for p in csv_paths]
-    df = pd.concat(frames, ignore_index=True)
-
-    num_cols = ["wer", "substitutions", "deletions", "insertions", "ref_words", "hyp_words", "asr_seconds"]
-    for c in num_cols:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-
-    if "audio_path" in df.columns:
-        df = df.drop(columns=["audio_path"])
-
-    df["model"] = df["model"].astype(str)
-    df["id"] = df["id"].astype(str)
-
-    df["ref_words"] = df["ref_words"].fillna(0).astype(int)
-    for c in ["substitutions", "deletions", "insertions", "hyp_words"]:
-        df[c] = df[c].fillna(0).astype(int)
-
-    df["wer"] = df["wer"].astype(float)
-    df["asr_seconds"] = df["asr_seconds"].astype(float)
-    df["err_words"] = df["substitutions"] + df["deletions"] + df["insertions"]
-
-    return df
-
-
-def summarize_eval_df(df: pd.DataFrame) -> pd.DataFrame:
-    model_summary = (
-        df.groupby("model", as_index=False)
-          .agg(
-              n_utts=("id", "nunique"),
-              total_ref_words=("ref_words", "sum"),
-              total_S=("substitutions", "sum"),
-              total_D=("deletions", "sum"),
-              total_I=("insertions", "sum"),
-              total_err=("err_words", "sum"),
-              mean_item_wer=("wer", "mean"),
-              median_item_wer=("wer", "median"),
-              p90_item_wer=("wer", lambda x: float(np.percentile(x, 90))),
-              total_asr_seconds=("asr_seconds", "sum"),
-              median_asr_seconds=("asr_seconds", "median"),
-              p90_asr_seconds=("asr_seconds", lambda x: float(np.percentile(x, 90))),
-          )
-    )
-
-    model_summary["corpus_wer"] = model_summary["total_err"] / model_summary["total_ref_words"]
-    model_summary["sec_per_ref_word"] = model_summary["total_asr_seconds"] / model_summary["total_ref_words"]
-
-    model_summary["S_per_word"] = model_summary["total_S"] / model_summary["total_ref_words"]
-    model_summary["D_per_word"] = model_summary["total_D"] / model_summary["total_ref_words"]
-    model_summary["I_per_word"] = model_summary["total_I"] / model_summary["total_ref_words"]
-
-    return model_summary.sort_values("corpus_wer").reset_index(drop=True)
-
-
-def make_order(model_summary: pd.DataFrame) -> List[str]:
-    return model_summary["model"].astype(str).tolist()
-
-
-def make_default_palette(shade_factor: float = 0.55) -> ModelPalette:
-    return ModelPalette(
-        family_fn=model_family,
-        family_base=family_colors,
-        family_label=family_labels,
-        shade_factor=shade_factor,
-    )
-    
-    
-def oracle_win_counts(df: pd.DataFrame, order: Iterable[str], tie_mode: str = "fractional") -> pd.DataFrame:
-    models = [str(m) for m in order]
-    pivot = df.pivot_table(index="id", columns="model", values="wer", aggfunc="mean").reindex(columns=models)
-
-    row_min = pivot.min(axis=1)
-    win_mask = pivot.eq(row_min, axis=0)
-
-    if tie_mode == "first":
-        winners = pivot.idxmin(axis=1)
-        counts = winners.value_counts().reindex(models).fillna(0).astype(int)
-        out = pd.DataFrame({"model": models, "n_wins": counts.to_numpy(dtype=int)})
-        out["win_share"] = out["n_wins"] / float(len(pivot))
-        return out.sort_values(["win_share", "n_wins", "model"], ascending=[False, False, True]).reset_index(drop=True)
-
-    if tie_mode == "strict":
-        is_tie = (win_mask.sum(axis=1) > 1)
-        strict = win_mask.loc[~is_tie]
-        counts = strict.sum(axis=0).reindex(models).fillna(0).astype(int)
-        denom = float(len(strict)) if len(strict) else 1.0
-        out = pd.DataFrame({"model": models, "n_wins": counts.to_numpy(dtype=int)})
-        out["win_share"] = out["n_wins"] / denom
-        return out.sort_values(["win_share", "n_wins", "model"], ascending=[False, False, True]).reset_index(drop=True)
-
-    if tie_mode == "fractional":
-        frac = win_mask.div(win_mask.sum(axis=1), axis=0).sum(axis=0).reindex(models).fillna(0.0)
-        out = pd.DataFrame({"model": models, "n_wins": frac.to_numpy(dtype=float)})
-        out["win_share"] = out["n_wins"] / float(len(pivot))
-        return out.sort_values(["win_share", "n_wins", "model"], ascending=[False, False, True]).reset_index(drop=True)
-
-    raise ValueError("tie_mode must be one of: 'fractional', 'strict', 'first'")
-
-
-
-
-def oracle_corpus_wer(df: pd.DataFrame, order: Iterable[str], tie_mode: str = "first") -> float:
-    models = [str(m) for m in order]
-    pivot = df.pivot_table(index="id", columns="model", values="wer", aggfunc="mean").reindex(columns=models)
-    row_min = pivot.min(axis=1)
-    win_mask = pivot.eq(row_min, axis=0)
-
-    if tie_mode == "first":
-        winners = pivot.idxmin(axis=1)
-        chosen = df.merge(pd.DataFrame({"id": pivot.index, "oracle_model": winners}), on="id", how="inner")
-        chosen = chosen[chosen["model"].astype(str) == chosen["oracle_model"].astype(str)]
-        return float(chosen["err_words"].sum() / chosen["ref_words"].sum())
-
-    if tie_mode == "strict":
-        is_tie = (win_mask.sum(axis=1) > 1)
-        winners = pivot.loc[~is_tie].idxmin(axis=1)
-        chosen = df.merge(pd.DataFrame({"id": winners.index, "oracle_model": winners}), on="id", how="inner")
-        chosen = chosen[chosen["model"].astype(str) == chosen["oracle_model"].astype(str)]
-        return float(chosen["err_words"].sum() / chosen["ref_words"].sum())
-
-    raise ValueError("tie_mode must be 'first' or 'strict'")
-
-### Plotting ### 
+# -----------------------------
+# Theme
+# -----------------------------
 
 sns.set_theme(
     style="darkgrid",
@@ -181,13 +53,15 @@ family_labels: Dict[str, str] = {
     "nemo_ctc": "NeMo CTC",
     "whisper": "Whisper",
     "transducer": "Transducer",
+    "tesseract": "Tesseract",
+    "trocr": "TrOCR",
     "other": "Other",
 }
 
 family_colors: Dict[str, str] = {k: c for k, c in zip(family_labels.keys(), hue_colors)}
 
 
-def model_family(model: str) -> str:
+def asr_model_family(model: str) -> str:
     m = str(model).lower()
     if m.startswith(("tiny", "base", "small", "medium", "large")) or "distil" in m or "turbo" in m:
         return "whisper"
@@ -197,6 +71,15 @@ def model_family(model: str) -> str:
         return "transducer"
     if m.startswith(("conformer", "citrinet", "quartznet", "jasper")):
         return "nemo_ctc"
+    return "other"
+
+
+def ocr_model_family(model: str) -> str:
+    m = str(model).lower()
+    if m.startswith(("tess", "tesseract")):
+        return "tesseract"
+    if "trocr" in m:
+        return "trocr"
     return "other"
 
 
@@ -275,10 +158,10 @@ class ModelPalette:
 
 
 def make_palette(
-    family_fn: Callable[[str], str] = model_family,
+    family_fn: Callable[[str], str],
+    shade_factor: float = 0.55,
     family_base: Optional[Dict[str, str]] = None,
     family_label: Optional[Dict[str, str]] = None,
-    shade_factor: float = 0.55,
     other_color: str = "#9CA3AF",
 ) -> ModelPalette:
     if family_base is None:
@@ -294,17 +177,204 @@ def make_palette(
     )
 
 
-def plot_corpus_wer_barh(
+# -----------------------------
+# Task specs
+# -----------------------------
+
+@dataclass(frozen=True)
+class EvalSpec:
+    file_prefix: str
+    runtime_col: str
+    metric_col: str
+    ref_len_col: str
+    err_cols: Tuple[str, str, str]
+    extra_numeric_cols: Tuple[str, ...] = ()
+
+
+asr_spec = EvalSpec(
+    file_prefix="asr_eval_",
+    runtime_col="asr_seconds",
+    metric_col="wer",
+    ref_len_col="ref_words",
+    err_cols=("substitutions", "deletions", "insertions"),
+    extra_numeric_cols=("hyp_words",),
+)
+
+ocr_wer_spec = EvalSpec(
+    file_prefix="ocr_eval_",
+    runtime_col="ocr_seconds",
+    metric_col="wer",
+    ref_len_col="ref_words",
+    err_cols=("word_substitutions", "word_deletions", "word_insertions"),
+    extra_numeric_cols=("cer", "ref_chars", "hyp_chars", "hyp_words", "char_substitutions", "char_deletions", "char_insertions"),
+)
+
+ocr_cer_spec = EvalSpec(
+    file_prefix="ocr_eval_",
+    runtime_col="ocr_seconds",
+    metric_col="cer",
+    ref_len_col="ref_chars",
+    err_cols=("char_substitutions", "char_deletions", "char_insertions"),
+    extra_numeric_cols=("wer", "ref_words", "hyp_words", "hyp_chars", "word_substitutions", "word_deletions", "word_insertions"),
+)
+
+
+# -----------------------------
+# Data loading
+# -----------------------------
+
+def list_eval_csvs(results_root: str, dataset: str, spec: EvalSpec) -> List[str]:
+    pattern = os.path.join(results_root, dataset, f"{spec.file_prefix}*.csv")
+    paths = sorted(glob.glob(pattern, recursive=False))
+    return [p for p in paths if os.path.getsize(p) > 0]
+
+
+def load_eval_df(results_root: str, dataset: str, spec: EvalSpec) -> pd.DataFrame:
+    csv_paths = list_eval_csvs(results_root, dataset, spec)
+
+    frames = []
+    for p in csv_paths:
+        f = pd.read_csv(p)
+        if f.empty:
+            continue
+        if f.dropna(how="all").empty:
+            continue
+        frames.append(f)
+
+    if not frames:
+        return pd.DataFrame()
+
+    df = pd.concat(frames, ignore_index=True)
+
+    needed = [
+        spec.metric_col,
+        spec.runtime_col,
+        spec.ref_len_col,
+        *spec.err_cols,
+        *spec.extra_numeric_cols,
+    ]
+    for c in needed:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    df["model"] = df["model"].astype(str)
+    df["id"] = df["id"].astype(str)
+
+    if spec.ref_len_col in df.columns:
+        df[spec.ref_len_col] = df[spec.ref_len_col].fillna(0).astype(int)
+
+    for c in spec.err_cols:
+        if c in df.columns:
+            df[c] = df[c].fillna(0).astype(int)
+
+    if spec.metric_col in df.columns:
+        df[spec.metric_col] = df[spec.metric_col].astype(float)
+    if spec.runtime_col in df.columns:
+        df[spec.runtime_col] = df[spec.runtime_col].astype(float)
+
+    df["err_units"] = 0
+    for c in spec.err_cols:
+        if c in df.columns:
+            df["err_units"] = df["err_units"] + df[c].fillna(0).astype(int)
+
+    return df
+
+
+def summarize_eval_df(df: pd.DataFrame, spec: EvalSpec) -> pd.DataFrame:
+    metric = spec.metric_col
+    runtime = spec.runtime_col
+    ref_len = spec.ref_len_col
+    s_col, d_col, i_col = spec.err_cols
+
+    agg = {
+        "n_items": ("id", "nunique"),
+        "total_ref_len": (ref_len, "sum"),
+        "total_S": (s_col, "sum"),
+        "total_D": (d_col, "sum"),
+        "total_I": (i_col, "sum"),
+        "total_err": ("err_units", "sum"),
+        "mean_item_metric": (metric, "mean"),
+        "median_item_metric": (metric, "median"),
+        "p90_item_metric": (metric, lambda x: float(np.percentile(x, 90))),
+        "total_runtime_seconds": (runtime, "sum"),
+        "median_runtime_seconds": (runtime, "median"),
+        "p90_runtime_seconds": (runtime, lambda x: float(np.percentile(x, 90))),
+    }
+
+    model_summary = df.groupby("model", as_index=False).agg(**agg)
+
+    model_summary["corpus_metric"] = model_summary["total_err"] / model_summary["total_ref_len"].replace({0: np.nan})
+    model_summary["sec_per_ref_unit"] = model_summary["total_runtime_seconds"] / model_summary["total_ref_len"].replace({0: np.nan})
+
+    model_summary["S_per_unit"] = model_summary["total_S"] / model_summary["total_ref_len"].replace({0: np.nan})
+    model_summary["D_per_unit"] = model_summary["total_D"] / model_summary["total_ref_len"].replace({0: np.nan})
+    model_summary["I_per_unit"] = model_summary["total_I"] / model_summary["total_ref_len"].replace({0: np.nan})
+
+    model_summary = model_summary.replace([np.inf, -np.inf], np.nan)
+    return model_summary.sort_values("corpus_metric").reset_index(drop=True)
+
+
+def make_order(model_summary: pd.DataFrame) -> List[str]:
+    return model_summary["model"].astype(str).tolist()
+
+
+# -----------------------------
+# Oracle utilities
+# -----------------------------
+
+def oracle_win_counts(
+    df: pd.DataFrame,
+    order: Iterable[str],
+    metric_col: str,
+    tie_mode: str = "fractional",
+) -> pd.DataFrame:
+    models = [str(m) for m in order]
+    pivot = df.pivot_table(index="id", columns="model", values=metric_col, aggfunc="mean").reindex(columns=models)
+
+    row_min = pivot.min(axis=1)
+    win_mask = pivot.eq(row_min, axis=0)
+
+    if tie_mode == "first":
+        winners = pivot.idxmin(axis=1)
+        counts = winners.value_counts().reindex(models).fillna(0).astype(int)
+        out = pd.DataFrame({"model": models, "n_wins": counts.to_numpy(dtype=int)})
+        out["win_share"] = out["n_wins"] / float(len(pivot))
+        return out.sort_values(["win_share", "n_wins", "model"], ascending=[False, False, True]).reset_index(drop=True)
+
+    if tie_mode == "strict":
+        is_tie = (win_mask.sum(axis=1) > 1)
+        strict = win_mask.loc[~is_tie]
+        counts = strict.sum(axis=0).reindex(models).fillna(0).astype(int)
+        denom = float(len(strict)) if len(strict) else 1.0
+        out = pd.DataFrame({"model": models, "n_wins": counts.to_numpy(dtype=int)})
+        out["win_share"] = out["n_wins"] / denom
+        return out.sort_values(["win_share", "n_wins", "model"], ascending=[False, False, True]).reset_index(drop=True)
+
+    if tie_mode == "fractional":
+        frac = win_mask.div(win_mask.sum(axis=1), axis=0).sum(axis=0).reindex(models).fillna(0.0)
+        out = pd.DataFrame({"model": models, "n_wins": frac.to_numpy(dtype=float)})
+        out["win_share"] = out["n_wins"] / float(len(pivot))
+        return out.sort_values(["win_share", "n_wins", "model"], ascending=[False, False, True]).reset_index(drop=True)
+
+    raise ValueError("tie_mode must be one of: 'fractional', 'strict', 'first'")
+
+
+# -----------------------------
+# Plotting
+# -----------------------------
+
+def plot_corpus_metric_barh(
     model_summary: pd.DataFrame,
     order: Iterable[str],
     palette: ModelPalette,
     families: Optional[Iterable[str]] = None,
     ax=None,
     return_data: bool = False,
+    xlabel: str = "corpus metric",
 ) -> Tuple[Any, ...]:
     use_order = palette.filter_models(order, families)
     plot_df = model_summary[model_summary["model"].astype(str).isin(use_order)].copy()
-    plot_df = plot_df.sort_values("corpus_wer").reset_index(drop=True)
+    plot_df = plot_df.sort_values("corpus_metric").reset_index(drop=True)
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, max(3, 0.35 * len(plot_df))))
@@ -314,12 +384,12 @@ def plot_corpus_wer_barh(
     models = plot_df["model"].astype(str).tolist()
     ax.barh(
         models,
-        plot_df["corpus_wer"].to_numpy(dtype=float),
+        plot_df["corpus_metric"].to_numpy(dtype=float),
         color=[palette.color_of(m) for m in models],
         edgecolor="white",
         linewidth=1.5,
     )
-    ax.set_xlabel("corpus wer")
+    ax.set_xlabel(xlabel)
     ax.grid(True, axis="x", alpha=0.5)
     ax.legend(
         handles=palette.legend_handles(use_order),
@@ -336,13 +406,15 @@ def plot_corpus_wer_barh(
     return fig, ax
 
 
-def plot_latency_vs_wer(
+def plot_latency_vs_metric(
     model_summary: pd.DataFrame,
     order: Iterable[str],
     palette: ModelPalette,
     families: Optional[Iterable[str]] = None,
     ax=None,
     return_data: bool = False,
+    xlabel: str = "median runtime seconds per item",
+    ylabel: str = "corpus metric",
 ) -> Tuple[Any, ...]:
     use_order = palette.filter_models(order, families)
     plot_df = model_summary[model_summary["model"].astype(str).isin(use_order)].copy()
@@ -356,16 +428,16 @@ def plot_latency_vs_wer(
     for _, r in plot_df.iterrows():
         m = str(r["model"])
         ax.scatter(
-            float(r["median_asr_seconds"]),
-            float(r["corpus_wer"]),
+            float(r["median_runtime_seconds"]),
+            float(r["corpus_metric"]),
             color=palette.color_of(m),
             edgecolor="white",
             linewidth=0.8,
         )
-        ax.annotate(m, (float(r["median_asr_seconds"]), float(r["corpus_wer"])), fontsize=9, alpha=0.9)
+        ax.annotate(m, (float(r["median_runtime_seconds"]), float(r["corpus_metric"])), fontsize=9, alpha=0.9)
 
-    ax.set_xlabel("median asr seconds per utterance")
-    ax.set_ylabel("corpus wer")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.grid(True, alpha=0.5)
     ax.legend(
         handles=palette.legend_handles(use_order),
@@ -382,65 +454,16 @@ def plot_latency_vs_wer(
     return fig, ax
 
 
-def plot_wer_boxplot(
+def plot_metric_cdf(
     df: pd.DataFrame,
     order: Iterable[str],
     palette: ModelPalette,
-    families: Optional[Iterable[str]] = None,
-    ax=None,
-    showfliers: bool = False,
-    return_data: bool = False,
-) -> Tuple[Any, ...]:
-    use_order = palette.filter_models(order, families)
-    work = df[df["model"].astype(str).isin(use_order)]
-
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(10, max(3, 0.35 * len(use_order))))
-    else:
-        fig = ax.figure
-
-    data = [work.loc[work["model"].astype(str) == m, "wer"].to_numpy(dtype=float) for m in use_order]
-    bp = ax.boxplot(data, vert=False, tick_labels=use_order, showfliers=showfliers, patch_artist=True)
-
-    for i, m in enumerate(use_order):
-        c = palette.color_of(m)
-        bp["boxes"][i].set_facecolor(c)
-        bp["boxes"][i].set_edgecolor("white")
-        bp["boxes"][i].set_linewidth(1.6)
-        bp["medians"][i].set_color("white")
-        bp["medians"][i].set_linewidth(1.8)
-        for w in (bp["whiskers"][2 * i], bp["whiskers"][2 * i + 1]):
-            w.set_color("white")
-            w.set_linewidth(1.2)
-        for cap in (bp["caps"][2 * i], bp["caps"][2 * i + 1]):
-            cap.set_color("white")
-            cap.set_linewidth(1.2)
-
-    ax.set_xlabel("utterance wer")
-    ax.grid(True, axis="x", alpha=0.3)
-    ax.legend(
-        handles=palette.legend_handles(use_order),
-        loc="lower right",
-        frameon=True,
-        facecolor=ax.get_facecolor(),
-        edgecolor="white",
-        fontsize=9,
-    )
-    fig.tight_layout()
-
-    if return_data:
-        return fig, ax, {"work_df": work, "use_order": use_order}
-    return fig, ax
-
-
-def plot_wer_cdf(
-    df: pd.DataFrame,
-    order: Iterable[str],
-    palette: ModelPalette,
+    metric_col: str,
     families: Optional[Iterable[str]] = None,
     ax=None,
     max_percentile: float = 99.0,
     return_data: bool = False,
+    xlabel: str = "metric",
 ) -> Tuple[Any, ...]:
     use_order = palette.filter_models(order, families)
     work = df[df["model"].astype(str).isin(use_order)]
@@ -451,7 +474,7 @@ def plot_wer_cdf(
         fig = ax.figure
 
     if len(work):
-        xmax = float(np.percentile(work["wer"].to_numpy(dtype=float), max_percentile))
+        xmax = float(np.percentile(work[metric_col].to_numpy(dtype=float), max_percentile))
         xmax = max(0.5, xmax)
     else:
         xmax = 0.5
@@ -460,15 +483,15 @@ def plot_wer_cdf(
 
     cdf = pd.DataFrame(index=xs)
     for m in use_order:
-        w = work.loc[work["model"].astype(str) == m, "wer"].to_numpy(dtype=float)
-        if w.size == 0:
+        v = work.loc[work["model"].astype(str) == m, metric_col].to_numpy(dtype=float)
+        if v.size == 0:
             continue
-        w = np.sort(w)
-        ys = np.searchsorted(w, xs, side="right") / float(len(w))
+        v = np.sort(v)
+        ys = np.searchsorted(v, xs, side="right") / float(len(v))
         cdf[m] = ys
         ax.plot(xs, ys, label=m, color=palette.color_of(m), linewidth=1.8)
 
-    ax.set_xlabel("utterance wer")
+    ax.set_xlabel(xlabel)
     ax.set_ylabel("cdf")
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=8, ncol=2)
@@ -479,10 +502,12 @@ def plot_wer_cdf(
     return fig, ax
 
 
-def wer_by_length_pivot(
+def metric_by_length_pivot(
     df: pd.DataFrame,
     order: Iterable[str],
     palette: ModelPalette,
+    ref_len_col: str,
+    err_units_col: str = "err_units",
     families: Optional[Iterable[str]] = None,
     bins: Optional[List[float]] = None,
     labels: Optional[List[str]] = None,
@@ -495,17 +520,17 @@ def wer_by_length_pivot(
 
     use_order = palette.filter_models(order, families)
     work = df[df["model"].astype(str).isin(use_order)].copy()
-    work["len_bin"] = pd.cut(work["ref_words"], bins=bins, labels=labels)
+    work["len_bin"] = pd.cut(work[ref_len_col], bins=bins, labels=labels)
 
     len_summary = (
         work.groupby(["model", "len_bin"], observed=False)
-        .agg(total_ref_words=("ref_words", "sum"), total_err=("err_words", "sum"))
+        .agg(total_ref_len=(ref_len_col, "sum"), total_err=(err_units_col, "sum"))
         .reset_index()
     )
-    len_summary["corpus_wer_in_bin"] = len_summary["total_err"] / len_summary["total_ref_words"]
+    len_summary["corpus_metric_in_bin"] = len_summary["total_err"] / len_summary["total_ref_len"].replace({0: np.nan})
 
     pivot = (
-        len_summary.pivot(index="len_bin", columns="model", values="corpus_wer_in_bin")
+        len_summary.pivot(index="len_bin", columns="model", values="corpus_metric_in_bin")
         .reindex(labels)
         .loc[:, use_order]
     )
@@ -515,7 +540,7 @@ def wer_by_length_pivot(
     return pivot, labels
 
 
-def plot_wer_by_length(
+def plot_metric_by_length(
     pivot: pd.DataFrame,
     labels: List[str],
     order: Iterable[str],
@@ -523,6 +548,8 @@ def plot_wer_by_length(
     families: Optional[Iterable[str]] = None,
     ax=None,
     return_data: bool = False,
+    xlabel: str = "reference length bin",
+    ylabel: str = "corpus metric within bin",
 ) -> Tuple[Any, ...]:
     use_order = palette.filter_models(order, families)
 
@@ -548,8 +575,8 @@ def plot_wer_by_length(
 
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
-    ax.set_xlabel("ref words bin")
-    ax.set_ylabel("corpus wer within bin")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=8, ncol=2)
     fig.tight_layout()

@@ -106,3 +106,4 @@ data/
 eval/results/
 eval/manifests/
 mlruns/
+eval/ocr_frames/
