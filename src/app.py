@@ -17,9 +17,10 @@ from .summarise import summarise_segments
 # ---------- Constants ----------
 
 
-VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi"}
-AUDIO_EXTS = {".wav", ".mp3", ".m4a", ".flac", ".ogg"}
-TEXT_EXTS = {".txt"}
+video_exts = {".mp4", ".mov", ".mkv", ".avi"}
+audio_exts = {".wav", ".mp3", ".m4a", ".flac", ".ogg"}
+text_exts = {".txt"}
+default_video_path = "uploaded_videos/input.mp4"
 
 
 # ---------- Session state helpers ----------
@@ -27,43 +28,39 @@ TEXT_EXTS = {".txt"}
 
 def detect_input_type_from_filename(filename: str) -> Optional[str]:
     ext = Path(filename).suffix.lower()
-    if ext in VIDEO_EXTS:
+    if ext in video_exts:
         return "Video"
-    if ext in AUDIO_EXTS:
+    if ext in audio_exts:
         return "Audio"
-    if ext in TEXT_EXTS:
+    if ext in text_exts:
         return "Text"
     return None
 
 
 def init_session_state() -> None:
-    """Initialise all session_state keys with defaults if missing."""
     defaults = {
-        "input_type": None,          # "Video", "Audio", "Text"
+        "input_type": None,
         "uploaded_filename": None,
-        "uploaded_file_path": None,  # full path of the last uploaded file
-        "run_id": None,              # unique per-session run identifier
-        # Source artefacts
+        "uploaded_file_path": None,
+        "run_id": None,
         "video_path": None,
-        "audio_path": None,          # for ASR, either from ingest or audio upload
+        "audio_path": None,
         "text_input": "",
-        # Pipeline config
         "output_dir": "outputs",
         "frame_interval_seconds": 3,
         "ocr_frame_stride": 2,
         "summariser_model_name": "facebook/bart-large-cnn",
-        "summariser_device": 0,      # use -1 for CPU
-        # Derived artefacts (in output_dir/run_id)
+        "summariser_device": 0,
         "frame_dir": None,
         "transcript_path": None,
         "ocr_output_path": None,
         "segments_path": None,
-        # In memory objects
         "inspect_result": None,
         "transcript_segments": None,
         "ocr_records": None,
         "segments_merged": None,
         "summary_text": None,
+        "use_default_input": False,
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
@@ -73,19 +70,16 @@ def init_session_state() -> None:
 
 
 def reset_downstream_state() -> None:
-    """
-    Delete artefacts from the previous run and reset in-memory state.
-    This acts on the current session only.
-    """
-    # Delete uploaded file itself
     uploaded_file_path = st.session_state.get("uploaded_file_path")
     if uploaded_file_path and os.path.exists(uploaded_file_path):
-        try:
-            os.remove(uploaded_file_path)
-        except OSError as exc:
-            st.warning(f"Could not delete uploaded file at {uploaded_file_path}: {exc}")
+        default_abs = str(Path(default_video_path).resolve())
+        current_abs = str(Path(uploaded_file_path).resolve())
+        if current_abs != default_abs:
+            try:
+                os.remove(uploaded_file_path)
+            except OSError as exc:
+                st.warning(f"Could not delete uploaded file at {uploaded_file_path}: {exc}")
 
-    # Delete generated artefacts
     frame_dir = st.session_state.get("frame_dir")
     if frame_dir and os.path.isdir(frame_dir):
         try:
@@ -94,14 +88,13 @@ def reset_downstream_state() -> None:
             st.warning(f"Could not delete frame directory {frame_dir}: {exc}")
 
     for key in ("audio_path", "transcript_path", "ocr_output_path", "segments_path"):
-        path = st.session_state.get(key)
-        if path and os.path.isfile(path):
+        file_path = st.session_state.get(key)
+        if file_path and os.path.isfile(file_path):
             try:
-                os.remove(path)
+                os.remove(file_path)
             except OSError as exc:
-                st.warning(f"Could not delete file {path}: {exc}")
+                st.warning(f"Could not delete file {file_path}: {exc}")
 
-    # Attempt to remove the per-run output directory if it exists
     output_dir = st.session_state.get("output_dir")
     run_id = st.session_state.get("run_id")
     if output_dir and run_id:
@@ -112,7 +105,6 @@ def reset_downstream_state() -> None:
             except OSError as exc:
                 st.warning(f"Could not delete run directory {run_dir}: {exc}")
 
-    # Reset in-memory state
     st.session_state["video_path"] = None
     st.session_state["audio_path"] = None
     st.session_state["text_input"] = ""
@@ -127,14 +119,11 @@ def reset_downstream_state() -> None:
     st.session_state["summary_text"] = None
     st.session_state["uploaded_file_path"] = None
     st.session_state["uploaded_filename"] = None
-    # New run id for next processing
+    st.session_state["use_default_input"] = False
     st.session_state["run_id"] = uuid.uuid4().hex[:8]
 
 
 def save_uploaded_file(uploaded_file) -> Tuple[str, Optional[str]]:
-    """
-    Save uploaded file to a type specific directory and return (path, input_type).
-    """
     filename = uploaded_file.name
     detected_type = detect_input_type_from_filename(filename)
 
@@ -157,12 +146,6 @@ def save_uploaded_file(uploaded_file) -> Tuple[str, Optional[str]]:
 
 
 def ensure_output_paths() -> None:
-    """
-    Ensure output directory exists and set paths for frames, transcript, OCR, segments.
-
-    For videos this also defines where audio.wav will be written by ingest.
-    For standalone audio files audio_path is already set and is not overwritten.
-    """
     base = Path(st.session_state["output_dir"])
     run_id = st.session_state.get("run_id")
     if run_id:
@@ -190,17 +173,17 @@ def ensure_output_paths() -> None:
 # ---------- Data helpers ----------
 
 
-def load_json_if_exists(path: Optional[str]) -> Any:
-    if path is None:
+def load_json_if_exists(file_path: Optional[str]) -> Any:
+    if file_path is None:
         return None
-    p = Path(path)
+    p = Path(file_path)
     if not p.exists():
         return None
     try:
         with p.open("r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as exc:
-        st.warning(f"Could not read JSON file at {path}: {exc}")
+        st.warning(f"Could not read JSON file at {file_path}: {exc}")
         return None
 
 
@@ -214,20 +197,18 @@ def list_sample_frames(frame_dir: Optional[str], max_items: int = 6) -> List[Pat
     return frames[:max_items]
 
 
-def inspect_audio_file(path: str) -> dict:
-    """Very lightweight audio inspection without extra dependencies."""
+def inspect_audio_file(file_path: str) -> dict:
     info = {
-        "path": path,
-        "exists": os.path.exists(path),
+        "path": file_path,
+        "exists": os.path.exists(file_path),
     }
-    if os.path.exists(path):
-        info["size_bytes"] = os.path.getsize(path)
-        info["extension"] = Path(path).suffix
+    if os.path.exists(file_path):
+        info["size_bytes"] = os.path.getsize(file_path)
+        info["extension"] = Path(file_path).suffix
     return info
 
 
 def build_segments_from_text(text: str) -> List[dict]:
-    """Create a minimal segment list from raw text so that summarise_segments can be reused."""
     text = text.strip()
     if not text:
         return []
@@ -242,19 +223,12 @@ def build_segments_from_text(text: str) -> List[dict]:
 
 
 def get_attr_or_key(obj: Any, key: str, default: Any = None) -> Any:
-    """
-    Helper that works for both dict-like objects and objects with attributes.
-    """
     if isinstance(obj, dict):
         return obj.get(key, default)
     return getattr(obj, key, default)
 
 
 def normalize_segments(segments: Any) -> List[Any]:
-    """
-    Ensure segments is a list for preview logic, handling dicts with 'segments'
-    or generic iterables.
-    """
     if segments is None:
         return []
     if isinstance(segments, dict):
@@ -270,30 +244,27 @@ def normalize_segments(segments: Any) -> List[Any]:
 
 
 def load_and_normalize(memory_key: str, path_key: str) -> List[Any]:
-    """Utility to load objects from memory or JSON and normalise them."""
     cached = st.session_state.get(memory_key)
     if cached is not None:
         return normalize_segments(cached)
-    path = st.session_state.get(path_key)
-    loaded = load_json_if_exists(path) if path else None
+    file_path = st.session_state.get(path_key)
+    loaded = load_json_if_exists(file_path) if file_path else None
     return normalize_segments(loaded)
 
 
 def _file_has_content(path_key: str) -> bool:
-    """Helper for pipeline status: file exists and is non-empty."""
-    path = st.session_state.get(path_key)
-    if not path:
+    file_path = st.session_state.get(path_key)
+    if not file_path:
         return False
-    if not os.path.isfile(path):
+    if not os.path.isfile(file_path):
         return False
     try:
-        return os.path.getsize(path) > 0
+        return os.path.getsize(file_path) > 0
     except OSError:
         return False
 
 
 def _frames_extracted(frame_dir_key: str = "frame_dir") -> bool:
-    """Helper for pipeline status: at least one frame file exists."""
     frame_dir = st.session_state.get(frame_dir_key)
     if not frame_dir or not os.path.isdir(frame_dir):
         return False
@@ -308,9 +279,6 @@ def display_segments_preview(
     max_preview: int = 20,
     slider_key: str = "segments_preview",
 ) -> None:
-    """
-    Display a slider-controlled preview of segments as a small table.
-    """
     import pandas as pd
 
     if not segments:
@@ -347,7 +315,6 @@ def display_ocr_preview(
     max_preview: int = 20,
     slider_key: str = "ocr_preview",
 ) -> None:
-    """Specialised preview for OCR records."""
     import pandas as pd
 
     if not records:
@@ -384,7 +351,6 @@ def display_aligned_preview(
     max_preview: int = 20,
     slider_key: str = "aligned_preview",
 ) -> None:
-    """Preview aligned segments with ASR and OCR text."""
     import pandas as pd
 
     if not segments:
@@ -408,11 +374,7 @@ def display_aligned_preview(
             {
                 "start": get_attr_or_key(seg, "start", None),
                 "end": get_attr_or_key(seg, "end", None),
-                "asr_text": get_attr_or_key(
-                    seg,
-                    "asr_text",
-                    get_attr_or_key(seg, "text", ""),
-                ),
+                "asr_text": get_attr_or_key(seg, "asr_text", get_attr_or_key(seg, "text", "")),
                 "ocr_text": get_attr_or_key(seg, "ocr_text", ""),
             }
         )
@@ -425,7 +387,6 @@ def display_aligned_preview(
 
 
 def render_pipeline_status(input_type: Optional[str]) -> None:
-    """Show high level pipeline readiness across steps, based on real outputs."""
     if input_type is None:
         return
 
@@ -434,43 +395,16 @@ def render_pipeline_status(input_type: Optional[str]) -> None:
     if input_type == "Video":
         steps = [
             ("Inspect", bool(st.session_state.get("inspect_result"))),
-            (
-                "Ingest",
-                _file_has_content("audio_path") and _frames_extracted("frame_dir"),
-            ),
-            (
-                "ASR",
-                (
-                    bool(st.session_state.get("transcript_segments"))
-                    or _file_has_content("transcript_path")
-                ),
-            ),
-            (
-                "OCR",
-                (
-                    bool(st.session_state.get("ocr_records"))
-                    or _file_has_content("ocr_output_path")
-                ),
-            ),
-            (
-                "Align",
-                (
-                    bool(st.session_state.get("segments_merged"))
-                    or _file_has_content("segments_path")
-                ),
-            ),
+            ("Ingest", _file_has_content("audio_path") and _frames_extracted("frame_dir")),
+            ("ASR", bool(st.session_state.get("transcript_segments")) or _file_has_content("transcript_path")),
+            ("OCR", bool(st.session_state.get("ocr_records")) or _file_has_content("ocr_output_path")),
+            ("Align", bool(st.session_state.get("segments_merged")) or _file_has_content("segments_path")),
             ("Summarise", bool(st.session_state.get("summary_text"))),
         ]
     elif input_type == "Audio":
         steps = [
             ("Inspect", bool(st.session_state.get("inspect_result"))),
-            (
-                "ASR",
-                (
-                    bool(st.session_state.get("transcript_segments"))
-                    or _file_has_content("transcript_path")
-                ),
-            ),
+            ("ASR", bool(st.session_state.get("transcript_segments")) or _file_has_content("transcript_path")),
             ("Summarise", bool(st.session_state.get("summary_text"))),
         ]
     elif input_type == "Text":
@@ -488,7 +422,6 @@ def render_pipeline_status(input_type: Optional[str]) -> None:
 
 @st.dialog("Clean generated files")
 def cleanup_dialog() -> None:
-    """Modal confirmation for cleaning generated files."""
     st.write(
         "This will delete the uploaded file and generated artefacts "
         "for the current session."
@@ -505,44 +438,57 @@ def cleanup_dialog() -> None:
 
 
 def render_sidebar() -> None:
-    """Sidebar for input upload and configuration."""
     st.sidebar.header("Input")
+
+    default_exists = Path(default_video_path).exists()
+    if default_exists:
+        use_default = st.sidebar.checkbox(
+            "Use default video (uploaded_videos/input.mp4)",
+            value=st.session_state.get("use_default_input", False),
+        )
+        if use_default and not st.session_state.get("use_default_input", False):
+            reset_downstream_state()
+            st.session_state["use_default_input"] = True
+            st.session_state["input_type"] = "Video"
+            st.session_state["video_path"] = default_video_path
+
+        if not use_default and st.session_state.get("use_default_input", False):
+            reset_downstream_state()
 
     uploaded_file = st.sidebar.file_uploader(
         "Upload a video, audio, or text file",
-        type=list(VIDEO_EXTS | AUDIO_EXTS | TEXT_EXTS),
+        type=list(video_exts | audio_exts | text_exts),
+        disabled=st.session_state.get("use_default_input", False),
     )
 
     if uploaded_file is not None:
         filename = uploaded_file.name
 
-        # If a different file is uploaded, reset everything and clean disk
         if st.session_state.get("uploaded_filename") != filename:
             reset_downstream_state()
             st.session_state["uploaded_filename"] = filename
 
-        path, detected_type = save_uploaded_file(uploaded_file)
-        st.session_state["uploaded_file_path"] = path
+        file_path, detected_type = save_uploaded_file(uploaded_file)
+        st.session_state["uploaded_file_path"] = file_path
         st.session_state["input_type"] = detected_type
+        st.session_state["use_default_input"] = False
 
         if detected_type == "Video":
-            st.session_state["video_path"] = path
-            st.sidebar.success(f"Detected video file: {path}")
+            st.session_state["video_path"] = file_path
+            st.sidebar.success(f"Detected video file: {file_path}")
         elif detected_type == "Audio":
-            st.session_state["audio_path"] = path
-            st.sidebar.success(f"Detected audio file: {path}")
+            st.session_state["audio_path"] = file_path
+            st.sidebar.success(f"Detected audio file: {file_path}")
         elif detected_type == "Text":
             try:
-                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     text_value = f.read()
             except Exception:
                 text_value = ""
             st.session_state["text_input"] = text_value
             st.sidebar.success("Detected text file and loaded its content.")
         else:
-            st.sidebar.warning(
-                "File extension not recognised as video, audio, or text."
-            )
+            st.sidebar.warning("File extension not recognised as video, audio, or text.")
             st.session_state["input_type"] = None
 
     st.sidebar.markdown("---")
@@ -598,8 +544,6 @@ def render_sidebar() -> None:
 
 
 def render_inspect_tab(input_type: str) -> None:
-    st.header("Inspect")
-
     col_main, col_preview = st.columns([1.3, 1])
 
     with col_main:
@@ -625,7 +569,6 @@ def render_inspect_tab(input_type: str) -> None:
                 else:
                     st.caption("Run the inspection to display metadata here.")
 
-
         elif input_type == "Audio":
             if st.session_state["audio_path"] is None:
                 st.warning("No audio available. Upload an audio file in the sidebar.")
@@ -638,9 +581,7 @@ def render_inspect_tab(input_type: str) -> None:
                             st.session_state["inspect_result"] = result
                             status.write("Inspection completed.")
                         except Exception as exc:
-                            status.update(
-                                label="Audio inspection failed", state="error"
-                            )
+                            status.update(label="Audio inspection failed", state="error")
                             st.error("Error during audio inspection.")
                             st.exception(exc)
 
@@ -648,9 +589,7 @@ def render_inspect_tab(input_type: str) -> None:
                     st.subheader("Audio metadata")
                     st.json(st.session_state["inspect_result"])
                 else:
-                    st.caption(
-                        "Click on the button above to show basic audio information."
-                    )
+                    st.caption("Click on the button above to show basic audio information.")
 
         else:
             st.info("Inspection is only available for video and audio inputs.")
@@ -673,7 +612,7 @@ def render_inspect_tab(input_type: str) -> None:
 
 
 def render_ingest_tab() -> None:
-    st.header("Ingest video: extract audio and frames")
+    st.subheader("Extract audio and frames")
 
     if st.session_state.get("input_type") != "Video":
         st.warning("Ingest is only relevant for video input.")
@@ -689,48 +628,33 @@ def render_ingest_tab() -> None:
         if st.button("Run ingest"):
             ensure_output_paths()
 
-            frame_dir = st.session_state.get("frame_dir")
-            audio_path = st.session_state.get("audio_path")
+            frame_bar = st.progress(0, text="Frames: waiting")
+            phase_bar = st.progress(0, text="Ingest: starting")
+
+            def frames_progress(i: int, total: int, message: str = "") -> None:
+                pct = int(i * 100 / max(total, 1))
+                frame_bar.progress(pct, text=message or f"Extracting frames: {i}/{total}")
 
             with st.status("Ingesting video", expanded=True) as status:
                 try:
-                    status.write("Cleaning previous frames and audio...")
-                    if frame_dir and os.path.isdir(frame_dir):
-                        try:
-                            shutil.rmtree(frame_dir)
-                        except OSError as exc:
-                            st.warning(
-                                f"Could not delete frame directory {frame_dir}: {exc}"
-                            )
-                        Path(frame_dir).mkdir(parents=True, exist_ok=True)
+                    phase_bar.progress(20, text="Extracting audio")
+                    extract_audio(st.session_state["video_path"], st.session_state["audio_path"])
 
-                    if audio_path and os.path.exists(audio_path):
-                        try:
-                            os.remove(audio_path)
-                        except OSError as exc:
-                            st.warning(
-                                f"Could not delete audio file {audio_path}: {exc}"
-                            )
-
-                    status.write("Extracting audio...")
-                    extract_audio(
-                        st.session_state["video_path"],
-                        st.session_state["audio_path"],
-                    )
-
-                    status.write("Extracting frames...")
+                    phase_bar.progress(50, text="Extracting frames")
                     extract_frames(
                         st.session_state["video_path"],
                         st.session_state["frame_dir"],
                         interval_seconds=st.session_state["frame_interval_seconds"],
+                        progress_cb=frames_progress,
                     )
 
-                    status.write("Ingestion completed.")
+                    phase_bar.progress(100, text="Ingest: done")
+                    frame_bar.progress(100, text="Frames: done")
                     st.success("Ingestion completed.")
                 except Exception as exc:
                     status.update(label="Ingestion failed", state="error")
-                    st.error("Error during ingestion.")
                     st.exception(exc)
+
 
     with col_outputs:
         st.subheader("Outputs")
@@ -755,8 +679,6 @@ def render_ingest_tab() -> None:
 
 
 def render_asr_tab(input_type: str) -> None:
-    st.header("Automatic Speech Recognition")
-
     col_main, col_preview = st.columns([1, 1.4])
 
     with col_main:
@@ -774,17 +696,29 @@ def render_asr_tab(input_type: str) -> None:
                     try:
                         os.remove(transcript_path)
                     except OSError as exc:
-                        st.warning(
-                            f"Could not delete transcript file {transcript_path}: {exc}"
-                        )
+                        st.warning(f"Could not delete transcript file {transcript_path}: {exc}")
                 st.session_state["transcript_segments"] = None
 
                 with st.status("Running ASR", expanded=True) as status:
                     try:
                         status.write("Transcribing audio...")
+                        asr_bar = st.progress(0, text="ASR: waiting")
+
+                        def asr_progress(current: float, total: float, message: str = "") -> None:
+                            pct = int(current * 100 / max(total, 1.0))
+                            if pct < 0:
+                                pct = 0
+                            if pct > 100:
+                                pct = 100
+                            current_s = int(round(current))
+                            total_s = int(round(total))
+
+                            asr_bar.progress(pct, text=f"ASR: {current_s}s / {total_s}s")
+
                         transcript_segments = run_asr(
                             st.session_state["audio_path"],
                             st.session_state["transcript_path"],
+                            progress_cb=asr_progress,
                         )
                         st.session_state["transcript_segments"] = transcript_segments
                         status.write("ASR completed.")
@@ -814,8 +748,6 @@ def render_asr_tab(input_type: str) -> None:
 
 
 def render_ocr_tab() -> None:
-    st.header("Optical Character Recognition on frames")
-
     input_type = st.session_state.get("input_type")
     if input_type != "Video":
         st.warning("OCR is only relevant for video input.")
@@ -836,20 +768,30 @@ def render_ocr_tab() -> None:
                 try:
                     os.remove(ocr_output_path)
                 except OSError as exc:
-                    st.warning(
-                        f"Could not delete OCR output file {ocr_output_path}: {exc}"
-                    )
+                    st.warning(f"Could not delete OCR output file {ocr_output_path}: {exc}")
             st.session_state["ocr_records"] = None
 
             with st.status("Running OCR on frames", expanded=True) as status:
                 try:
                     status.write("Processing frames for OCR...")
+                    ocr_bar = st.progress(0, text="OCR: waiting")
+
+                    def ocr_progress(i: int, total: int, message: str = "") -> None:
+                        pct = int(i * 100 / max(total, 1))
+                        if pct < 0:
+                            pct = 0
+                        if pct > 100:
+                            pct = 100
+                        ocr_bar.progress(pct, text=message or f"OCR: {i}/{total}")
+
                     ocr_records = run_ocr_on_frames(
                         frame_dir=st.session_state["frame_dir"],
                         ocr_output_path=st.session_state["ocr_output_path"],
                         frame_interval_seconds=st.session_state["frame_interval_seconds"],
                         ocr_frame_stride=st.session_state["ocr_frame_stride"],
+                        progress_cb=ocr_progress,
                     )
+
                     st.session_state["ocr_records"] = ocr_records
                     status.write("OCR completed.")
                     st.success("OCR completed.")
@@ -878,16 +820,12 @@ def render_ocr_tab() -> None:
 
 
 def render_align_tab() -> None:
-    st.header("Align transcript and OCR")
-
     input_type = st.session_state.get("input_type")
     if input_type != "Video":
         st.warning("Alignment is only relevant for video input.")
         return
 
-    if st.session_state.get("transcript_path") is None or st.session_state.get(
-        "ocr_output_path"
-    ) is None:
+    if st.session_state.get("transcript_path") is None or st.session_state.get("ocr_output_path") is None:
         st.warning("Transcript or OCR outputs not found. Run ASR and OCR first.")
         return
 
@@ -899,9 +837,7 @@ def render_align_tab() -> None:
 
             with st.status("Aligning ASR and OCR segments", expanded=True) as status:
                 try:
-                    transcript_segments = load_and_normalize(
-                        "transcript_segments", "transcript_path"
-                    )
+                    transcript_segments = load_and_normalize("transcript_segments", "transcript_path")
                     ocr_records = load_and_normalize("ocr_records", "ocr_output_path")
 
                     if not transcript_segments or not ocr_records:
@@ -941,38 +877,26 @@ def render_align_tab() -> None:
 
 
 def render_summarise_tab(input_type: str) -> None:
-    st.header("Summarise")
-
     if input_type == "Video":
         col_main, col_summary = st.columns([1, 1.4])
 
         with col_main:
             if st.button("Run summarisation from video"):
-                with st.status(
-                    "Generating summary from video segments", expanded=True
-                ) as status:
+                with st.status("Generating summary from video segments", expanded=True) as status:
                     try:
-                        segments_raw = (
-                            st.session_state.get("segments_merged")
-                            or load_json_if_exists(st.session_state.get("segments_path"))
+                        segments_raw = st.session_state.get("segments_merged") or load_json_if_exists(
+                            st.session_state.get("segments_path")
                         )
                         if not segments_raw:
-                            status.write(
-                                "No aligned segments found. Falling back to ASR transcript."
-                            )
-                            segments_raw = (
-                                st.session_state.get("transcript_segments")
-                                or load_json_if_exists(
-                                    st.session_state.get("transcript_path")
-                                )
+                            status.write("No aligned segments found. Falling back to ASR transcript.")
+                            segments_raw = st.session_state.get("transcript_segments") or load_json_if_exists(
+                                st.session_state.get("transcript_path")
                             )
 
                         segments = normalize_segments(segments_raw)
 
                         if not segments:
-                            status.update(
-                                label="Summarisation failed", state="error"
-                            )
+                            status.update(label="Summarisation failed", state="error")
                             st.error("No segments available for summarisation.")
                         else:
                             status.write(
@@ -1003,25 +927,16 @@ def render_summarise_tab(input_type: str) -> None:
 
         with col_main:
             if st.button("Run summarisation from audio transcript"):
-                with st.status(
-                    "Generating summary from audio transcript", expanded=True
-                ) as status:
+                with st.status("Generating summary from audio transcript", expanded=True) as status:
                     try:
-                        segments_raw = (
-                            st.session_state.get("transcript_segments")
-                            or load_json_if_exists(
-                                st.session_state.get("transcript_path")
-                            )
+                        segments_raw = st.session_state.get("transcript_segments") or load_json_if_exists(
+                            st.session_state.get("transcript_path")
                         )
                         segments = normalize_segments(segments_raw)
 
                         if not segments:
-                            status.update(
-                                label="Summarisation failed", state="error"
-                            )
-                            st.error(
-                                "No transcript segments available for summarisation."
-                            )
+                            status.update(label="Summarisation failed", state="error")
+                            st.error("No transcript segments available for summarisation.")
                         else:
                             status.write(
                                 f"Summarising {len(segments)} segments with model "
@@ -1060,17 +975,11 @@ def render_summarise_tab(input_type: str) -> None:
             st.session_state["text_input"] = text_value
 
             if st.button("Run summarisation on text"):
-                with st.status(
-                    "Generating summary from text input", expanded=True
-                ) as status:
+                with st.status("Generating summary from text input", expanded=True) as status:
                     try:
-                        segments = build_segments_from_text(
-                            st.session_state["text_input"]
-                        )
+                        segments = build_segments_from_text(st.session_state["text_input"])
                         if not segments:
-                            status.update(
-                                label="Summarisation failed", state="error"
-                            )
+                            status.update(label="Summarisation failed", state="error")
                             st.error("No text provided for summarisation.")
                         else:
                             status.write(
@@ -1120,6 +1029,32 @@ def render_summary_output() -> None:
     else:
         st.caption("No summary available yet.")
 
+def render_boxes(input_type: str) -> None:
+    renderers = {
+        "Video": [
+            ("Inspect", lambda: render_inspect_tab(input_type)),
+            ("Ingest", render_ingest_tab),
+            ("ASR", lambda: render_asr_tab(input_type)),
+            ("OCR", render_ocr_tab),
+            ("Align", render_align_tab),
+            ("Summarise", lambda: render_summarise_tab(input_type)),
+        ],
+        "Audio": [
+            ("Inspect", lambda: render_inspect_tab(input_type)),
+            ("ASR", lambda: render_asr_tab(input_type)),
+            ("Summarise", lambda: render_summarise_tab(input_type)),
+        ],
+        "Text": [
+            ("Summarise", lambda: render_summarise_tab(input_type)),
+        ],
+    }
+
+    default_expanded = {"Inspect", "Summarise"}
+
+    for label, fn in renderers.get(input_type, []):
+        with st.expander(label, expanded=(label in default_expanded)):
+            fn()
+
 
 # ---------- Main entrypoint for Streamlit ----------
 
@@ -1146,36 +1081,4 @@ def run() -> None:
 
     render_pipeline_status(input_type)
 
-    st.markdown("---")
-
-    # Tabs based on input type
-    if input_type == "Video":
-        tab_inspect, tab_ingest, tab_asr, tab_ocr, tab_align, tab_sum = st.tabs(
-            ["Inspect", "Ingest", "ASR", "OCR", "Align", "Summarise"]
-        )
-        with tab_inspect:
-            render_inspect_tab(input_type)
-        with tab_ingest:
-            render_ingest_tab()
-        with tab_asr:
-            render_asr_tab(input_type)
-        with tab_ocr:
-            render_ocr_tab()
-        with tab_align:
-            render_align_tab()
-        with tab_sum:
-            render_summarise_tab(input_type)
-
-    elif input_type == "Audio":
-        tab_inspect, tab_asr, tab_sum = st.tabs(["Inspect", "ASR", "Summarise"])
-        with tab_inspect:
-            render_inspect_tab(input_type)
-        with tab_asr:
-            render_asr_tab(input_type)
-        with tab_sum:
-            render_summarise_tab(input_type)
-
-    elif input_type == "Text":
-        (tab_sum,) = st.tabs(["Summarise"])
-        with tab_sum:
-            render_summarise_tab(input_type)
+    render_boxes(input_type)

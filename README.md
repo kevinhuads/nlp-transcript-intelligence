@@ -60,7 +60,6 @@ Expect breaking changes as the project evolves. The API and CLI are not consider
 The relevant part of the repository currently looks like:
 
 ```text
-.
 ├── configs/
 │   ├── align.yaml
 │   ├── asr.yaml
@@ -79,15 +78,31 @@ The relevant part of the repository currently looks like:
 │   ├── models.py
 │   ├── ocr.py
 │   └── summarise.py
-└── tests/
-    ├── conftest.py
-    ├── test_aligns.py
-    ├── test_asr.py
-    ├── test_ingest.py
-    ├── test_main.py
-    ├── test_models.py
-    ├── test_ocr.py
-    └── test_summarise.py
+├── tests/
+│   ├── conftest.py
+│   ├── test_aligns.py
+│   ├── test_asr.py
+│   ├── test_ingest.py
+│   ├── test_main.py
+│   ├── test_models.py
+│   ├── test_ocr.py
+│   └── test_summarise.py
+├── uploaded_videos/
+│   └── input.mp4
+└── eval/
+    ├── README.md
+    ├── asr_eval.py
+    ├── asr_backends.py
+    ├── asr_metrics.py
+    ├── write_manifests.py
+    ├── eval_notebook_utils.py
+    ├── asr_eval_notebook.ipynb
+    ├── configs/
+    │   └── asr.yaml
+    ├── manifests/
+    │   └── librispeech_<split>_manifest.csv
+    └── results/
+        └── <dataset>/
 ```
 
 The `configs/` directory in the repository root contains example YAML configuration files for individual stages of the pipeline (`align.yaml`, `asr.yaml`, `ingest.yaml`, `ocr.yaml`, `summarise.yaml`), a combined configuration for the full pipeline (`full_pipeline.yaml`), and a project level example (`project_example.yaml`). These files can be used as starting points for structured configuration of the CLI or for integrating the pipeline into larger projects.
@@ -153,6 +168,15 @@ Make sure both are installed and accessible in the `PATH`.
 
 ## Usage
 
+### Default input video
+
+A canonical default video can be placed at:
+
+- `uploaded_videos/input.mp4`
+
+When present, the Streamlit app can run the pipeline without uploading a file, and the CLI can default to this path when `--video-path` is omitted.
+
+
 ### 1. Basic pipeline run (CLI)
 
 The current CLI entry point is `src.main`. From the project root, run:
@@ -166,12 +190,14 @@ python -m src.main \
   --summariser-device 0
 ```
 
+If a default video exists at `uploaded_videos/input.mp4`, `--video-path` can be omitted.
+
 Arguments:
 
-- `--video-path` (required)  
+- `--video-path` (optional, default: `uploaded_videos/input.mp4` when present)  
   Path to the input video file.
 
-- `--output-dir` (required)  
+- `--output-dir` (optional, default: `outputs/default`)  
   Directory where all artefacts will be written.
 
 - `--frame-interval-seconds` (optional, default `3`)  
@@ -239,7 +265,8 @@ OUT_DIR/
 
 ## Streamlit application
 
-In addition to the CLI, the repository provides an interactive web interface built with Streamlit. This application exposes the same stages of the pipeline through a set of tabs:
+If a default video exists at `uploaded_videos/input.mp4`, the sidebar can select it as the input without uploading a file.
+In addition to the CLI, the repository provides an interactive web interface built with Streamlit. This application exposes the same stages of the pipeline through a set of boxes:
 
 - **Inspect**: video or audio metadata preview and media playback.
 - **Ingest**: extraction of audio and frames from video input.

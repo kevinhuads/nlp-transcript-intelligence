@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import glob
 import json
 import os
-import glob
 from typing import List
 
 from PIL import Image
@@ -17,11 +17,8 @@ def run_ocr_on_frames(
     ocr_output_path: str,
     frame_interval_seconds: int = 3,
     ocr_frame_stride: int = 2,
+    progress_cb=None,
 ) -> List[OCRRecord]:
-    """
-    Runs OCR on sampled frames and stores the result.
-    The `frame_interval_seconds` must match the interval used when extracting frames.
-    """
     ocr_output_dir = os.path.dirname(ocr_output_path)
     if ocr_output_dir:
         os.makedirs(ocr_output_dir, exist_ok=True)
@@ -31,6 +28,8 @@ def run_ocr_on_frames(
         with open(ocr_output_path, "r", encoding="utf-8") as f:
             raw = json.load(f)
         records = [OCRRecord.from_dict(x) for x in raw]
+        if progress_cb is not None:
+            progress_cb(1, 1, "OCR: cached output loaded")
         print(f"Loaded OCR text for {len(records)} frames.")
         return records
 
@@ -38,8 +37,11 @@ def run_ocr_on_frames(
     print("Running OCR on sampled frames …")
 
     frame_files = sorted(glob.glob(os.path.join(frame_dir, "frame_*.jpg")))
+    sample_files = frame_files[::max(ocr_frame_stride, 1)]
+    total = len(sample_files)
 
-    for idx, frame_path in enumerate(tqdm(frame_files)):
+    done = 0
+    for idx, frame_path in enumerate(tqdm(frame_files, total=len(frame_files))):
         if idx % ocr_frame_stride != 0:
             continue
 
@@ -56,8 +58,15 @@ def run_ocr_on_frames(
             )
         )
 
+        done += 1
+        if progress_cb is not None:
+            progress_cb(done, max(total, 1), f"OCR: {done}/{max(total, 1)} frames")
+
     with open(ocr_output_path, "w", encoding="utf-8") as f:
         json.dump(ocr_to_jsonable(records), f, ensure_ascii=False, indent=2)
+
+    if progress_cb is not None:
+        progress_cb(1, 1, "OCR: done")
 
     print(f"Saved OCR output for {len(records)} frames to: {ocr_output_path}")
     return records

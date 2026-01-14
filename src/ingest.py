@@ -41,30 +41,38 @@ def extract_audio(video_path: str, audio_path: str) -> None:
         clip.audio.write_audiofile(audio_path)
         print(f"Saved audio to: {audio_path}")
 
-
 def extract_frames(
     video_path: str,
     frame_dir: str,
     interval_seconds: int = 3,
+    progress_cb=None,
 ) -> None:
     os.makedirs(frame_dir, exist_ok=True)
 
-    # Open the video only inside this context
     with VideoFileClip(video_path) as clip:
-        duration = clip.duration
+        duration = float(clip.duration)
 
-        n_frames = int(duration // interval_seconds) + 1
-        print(f"Planned number of frames: {n_frames}")
+        times = list(range(0, int(duration) + 1, interval_seconds))
+        if not times:
+            times = [0]
+        if times[-1] < duration:
+            times.append(int(duration))
+
+        total = len(times)
+        print(f"Planned number of frames: {total}")
         print(f"Saving frames to: {frame_dir}")
 
-        for i, t in enumerate(tqdm(range(0, int(duration) + 1, interval_seconds))):
-            frame_time = min(t, duration)
-            frame = clip.get_frame(frame_time)
+        for i, t in enumerate(tqdm(times, total=total)):
+            frame_time = min(float(t), duration)
             frame_path = os.path.join(frame_dir, f"frame_{i:05d}.jpg")
-            if os.path.exists(frame_path):
-                continue
-            img = Image.fromarray(frame)
-            img.save(frame_path, format="JPEG")
+
+            if not os.path.exists(frame_path):
+                frame = clip.get_frame(frame_time)
+                img = Image.fromarray(frame)
+                img.save(frame_path, format="JPEG")
+
+            if progress_cb is not None:
+                progress_cb(i + 1, total, f"Extracting frames: {i + 1}/{total}")
 
     audio_path = os.path.join(os.path.dirname(frame_dir), "audio.wav")
     audio_present = os.path.exists(audio_path)

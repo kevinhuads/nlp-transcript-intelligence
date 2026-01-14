@@ -9,6 +9,9 @@ from .ocr import run_ocr_on_frames, preview_ocr
 from .align import align_transcript_and_ocr, preview_segments
 from .summarise import summarise_segments
 
+DEFAULT_VIDEO_PATH = "uploaded_videos/input.mp4"
+DEFAULT_OUTPUT_DIR = "outputs/default"
+
 
 def run_full_pipeline(
     video_path: str,
@@ -76,13 +79,13 @@ def main() -> None:
     parser.add_argument(
         "--video-path",
         type=str,
-        required=True,
+        default=DEFAULT_VIDEO_PATH,
         help="Path to input MP4 video.",
     )
     parser.add_argument(
         "--output-dir",
         type=str,
-        required=True,
+        default=DEFAULT_OUTPUT_DIR,
         help="Directory where artefacts will be written.",
     )
     parser.add_argument(

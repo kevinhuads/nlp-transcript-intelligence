@@ -23,8 +23,6 @@ def _config_signature(
     language: Optional[str],
     task: str,
 ) -> str:
-    # Stable string used to detect whether a cached transcript matches the requested ASR settings.
-    # Avoids reusing transcripts generated with a different model or decoding configuration.
     lang = language or ""
     return f"{model_id}|{device}|{compute_type}|beam={beam_size}|lang={lang}|task={task}"
 
@@ -36,7 +34,6 @@ def _read_cached_segments(transcript_path: str) -> Tuple[Optional[str], Optional
     with open(transcript_path, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
-    # Backward compatible with the previous format: a plain list of segments.
     if isinstance(raw, list):
         return None, [TranscriptSegment.from_dict(x) for x in raw]
 
@@ -59,6 +56,7 @@ def run_asr(
     language: Optional[str] = None,
     task: str = "transcribe",
     force: bool = False,
+    progress_cb=None,
 ) -> List[TranscriptSegment]:
     _ensure_dir(transcript_path)
 
@@ -74,6 +72,8 @@ def run_asr(
     cached_sig, cached_segments = _read_cached_segments(transcript_path)
     if not force and cached_segments is not None:
         if cached_sig is None or cached_sig == requested_sig:
+            if progress_cb is not None:
+                progress_cb(1, 1, "ASR: cached transcript loaded")
             print(f"Transcript file already exists: {transcript_path}")
             print(f"Loaded {len(cached_segments)} transcript segments.")
             return cached_segments
@@ -87,12 +87,14 @@ def run_asr(
     model = WhisperModel(model_id, device=device, compute_type=compute_type)
 
     print(f"Transcribing audio: {audio_path}")
-    segments_iter, _info = model.transcribe(
+    segments_iter, info = model.transcribe(
         str(audio_path),
         beam_size=beam_size,
         language=language,
         task=task,
     )
+
+    total_seconds = float(getattr(info, "duration", 0.0) or 0.0)
 
     segments: List[TranscriptSegment] = []
     for seg in segments_iter:
@@ -103,6 +105,13 @@ def run_asr(
                 text=seg.text.strip(),
             )
         )
+
+        if progress_cb is not None:
+            current = float(seg.end)
+            total = total_seconds if total_seconds > 0 else 1.0
+            if current > total:
+                current = total
+            progress_cb(current, total, f"ASR: {current:.1f}s / {total:.1f}s")
 
     payload = {
         "meta": {
@@ -119,6 +128,9 @@ def run_asr(
 
     with open(transcript_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    if progress_cb is not None:
+        progress_cb(1, 1, "ASR: done")
 
     print(f"Saved transcript to: {transcript_path}")
     print(f"Number of transcript segments: {len(segments)}")
