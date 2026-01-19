@@ -1,6 +1,6 @@
 # NLP Video Pipeline
 
-This repository contains the early version of a multimodal NLP pipeline for videos.  
+This repository contains an early version of a multimodal NLP pipeline for videos.  
 Starting from a raw video file, the pipeline extracts audio and frames, runs ASR and OCR, aligns speech with slide text, and produces both a global textual summary and a structured summary artefact.
 
 The project is in its initial stages and is designed to be extended and refactored over time. The current focus is on having a clear, testable core pipeline that can be built upon.
@@ -38,6 +38,12 @@ At the moment, the project provides:
      - Simple statistics (number of segments, chunks, character counts).
      - Per-chunk summaries and metadata.
 
+7. **Retrieval augmented Q/A (experimental, work in progress)**
+   - Builds a lightweight local index from transcript segments (optionally enriched with aligned OCR text).
+   - Uses an embedding model to retrieve the most relevant chunks for a question and then generates an answer using a local LLM.
+   - Returns answers with source markers (for example `[S1]`, `[S2]`) and exposes the underlying timestamp metadata when available.
+   - Current implementation stores embeddings in a JSON index file and performs cosine similarity in Python. This is intended as an intermediate step before moving to a proper vector store and more robust retrieval and evaluation.
+
 All of the above are orchestrated via a single pipeline entry point, and the individual stages can also be called from Python.
 
 ---
@@ -50,6 +56,7 @@ This is a **work in progress** and currently focuses on:
 - Ensuring each step is individually testable.
 - Having a basic end to end flow run via a command line interface.
 - Beginning to persist derived artefacts in structured form to enable downstream tasks (for example search, RAG, and analytics).
+- Prototyping a local RAG Q/A loop in the Streamlit UI. This is experimental and the API may change.
 
 Expect breaking changes as the project evolves. The API and CLI are not considered stable yet.
 
@@ -77,6 +84,7 @@ The relevant part of the repository currently looks like:
 │   ├── main.py
 │   ├── models.py
 │   ├── ocr.py
+│   ├── qa.py
 │   └── summarise.py
 ├── tests/
 │   ├── conftest.py
@@ -115,7 +123,7 @@ The `configs/` directory in the repository root contains example YAML configurat
 
 ```bash
 git clone https://github.com/kevinhuads/nlp-transcript-intelligence.git
-cd NLP-Videos
+cd nlp-transcript-intelligence
 ```
 
 ### 2. Create and activate a virtual environment
@@ -144,6 +152,10 @@ Typical runtime dependencies include (non exhaustive):
 - `transformers`
 - `torch` (or compatible backend for `transformers`)
 
+Additional dependencies for the experimental Q/A module:
+
+- `langchain-ollama`
+
 Example:
 
 ```bash
@@ -162,7 +174,10 @@ Some components require system level tools.
 - **Tesseract OCR**  
   Required by `pytesseract` for running OCR on frames.
 
-Make sure both are installed and accessible in the `PATH`.
+- **Ollama (optional, for Q/A)**  
+  Required to run local LLM and embedding models via the experimental RAG Q/A feature.
+
+Make sure required tools are installed and accessible in the `PATH`.
 
 ---
 
@@ -175,7 +190,6 @@ A canonical default video can be placed at:
 - `uploaded_videos/input.mp4`
 
 When present, the Streamlit app can run the pipeline without uploading a file, and the CLI can default to this path when `--video-path` is omitted.
-
 
 ### 1. Basic pipeline run (CLI)
 
@@ -259,13 +273,21 @@ OUT_DIR/
 └── summary.json
 ```
 
-`summary.json` contains the global summary text together with basic statistics and per-chunk summaries.
+When using the experimental Q/A indexing (currently exposed primarily via Streamlit), another artefact can be created under the per run directory:
+
+```text
+OUT_DIR/
+└── qa_index.json
+```
+
+`qa_index.json` stores the chunked text, per chunk metadata, and precomputed embeddings for retrieval.
 
 ---
 
 ## Streamlit application
 
 If a default video exists at `uploaded_videos/input.mp4`, the sidebar can select it as the input without uploading a file.
+
 In addition to the CLI, the repository provides an interactive web interface built with Streamlit. This application exposes the same stages of the pipeline through a set of boxes:
 
 - **Inspect**: video or audio metadata preview and media playback.
@@ -274,6 +296,7 @@ In addition to the CLI, the repository provides an interactive web interface bui
 - **OCR**: running OCR on sampled frames and previewing OCR records.
 - **Align**: aligning ASR segments with OCR timestamps.
 - **Summarise**: generating a global textual summary from aligned or ASR-only segments, or directly from text input.
+- **Questions and Answers (experimental, work in progress)**: builds a local RAG index from available segments and answers questions using a local Ollama LLM, with retrieved sources shown alongside timestamp metadata when available.
 
 From the project root, the application can be started with:
 
@@ -281,7 +304,20 @@ From the project root, the application can be started with:
 streamlit run src/app.py
 ```
 
-Adjust the path if the Streamlit entry point lives under a different filename or package. The application manages per session artefacts under a configurable output directory and keeps intermediate results in Streamlit session state so that each tab can build upon previous steps.
+The application manages per session artefacts under a configurable output directory and keeps intermediate results in Streamlit session state so that each step can build upon previous steps.
+
+### Experimental Q/A notes
+
+The current Q/A feature assumes an Ollama server is reachable (default `http://localhost:11434`). The UI can list available models from `/api/tags` when the server is reachable.
+
+Typical workflow in the Streamlit app:
+
+1. Run earlier stages to produce transcript segments (and optionally aligned segments for video).
+2. Open **Questions and Answers**.
+3. Build or rebuild the index.
+4. Ask questions and inspect retrieved sources.
+
+This is a prototype and may change substantially, especially around retrieval, persistence, evaluation, and UI integration.
 
 ---
 
@@ -348,7 +384,6 @@ segments_merged = align_transcript_and_ocr(
 )
 preview_segments(segments_merged, n=5)
 
-# Global summary printed to stdout and returned as a string
 summary_text = summarise_segments(
     segments_merged,
     model_name="facebook/bart-large-cnn",
@@ -358,32 +393,41 @@ summary_text = summarise_segments(
     min_length=40,
 )
 print(summary_text)
-
-# Structured summary persisted to summary.json
-video_summary = summarise_segments(
-    segments=segments_merged,
-    video_path=video_path,
-    output_dir=output_dir,
-    model_name="facebook/bart-large-cnn",
-    device=0,
-    max_chunk_chars=3000,
-    max_length=500,
-    min_length=40,
-)
-
-print(video_summary.video_id)
-print(video_summary.stats)
 ```
 
-The `summarise_segments_and_save` helper computes a global summary, derives simple statistics, and writes a `summary.json` file in `output_dir`. It returns a `VideoSummary` object that contains:
+### Experimental Q/A helpers
 
-- `video_id`, `video_path`, `output_dir`
-- `generated_at`, `model_name`
-- `parameters` used for summarisation
-- `stats` about the input and output text
-- `summary_text` and a list of `SummaryChunk` objects
+The experimental RAG Q/A module can also be called from Python:
 
-This structured artefact is intended for downstream tasks such as search, RAG, evaluation, or analytics.
+```python
+from src.qa import build_qa_index, answer_question
+
+index = build_qa_index(
+    segments=segments_merged,
+    index_path="path/to/output/qa_index.json",
+    embed_model="nomic-embed-text",
+    chunk_chars=900,
+    chunk_overlap=150,
+    text_mode="aligned",
+    force=True,
+    host="http://localhost:11434",
+)
+
+result = answer_question(
+    question="What are the main conclusions?",
+    index_path="path/to/output/qa_index.json",
+    llm_model="llama3.2:3b",
+    embed_model="nomic-embed-text",
+    top_k=5,
+    host="http://localhost:11434",
+)
+
+print(result["answer"])
+for src in result["sources"]:
+    print(src["source_id"], src["meta"])
+```
+
+This is a prototype interface and may change as retrieval, persistence, and evaluation are improved.
 
 ---
 
@@ -409,6 +453,8 @@ Tests cover:
 
 Heavy external dependencies (video processing, OCR, large models) are mocked in tests.
 
+Note: the experimental Q/A module is not yet covered by the test suite.
+
 ---
 
 ## Evaluation and benchmarks
@@ -428,7 +474,6 @@ Key observations from the current runs:
 
 For details on the dataset splits, manifest format, normalization choices, model list, decoding settings, and the analysis notebook, see `eval/README.md` and `eval/asr_eval_notebook.ipynb`.
 
-
 ### Outputs
 
 Results are written under `eval/results/<dataset>/`:
@@ -438,6 +483,7 @@ Results are written under `eval/results/<dataset>/`:
 
 The analysis notebook `eval/asr_eval_notebook.ipynb` compares models on accuracy, latency, and error profiles.
 
+---
 
 ## Roadmap and ideas for future work
 
@@ -451,5 +497,13 @@ This repository is intended to grow into a richer toolkit for video understandin
 - Extension of the Streamlit web UI and exploration of alternative UI frontends.
 - Performance optimisations, batching, and distributed processing.
 - More comprehensive logging, metrics, and monitoring.
+
+RAG and Q/A (work in progress):
+
+- Replace the JSON embedding cache with a proper vector store (for example FAISS) and add incremental indexing.
+- Add better chunking, deduplication, and segment aware retrieval (timestamps, sections, slide changes).
+- Add reranking and hybrid retrieval (sparse plus dense) for better precision on long videos.
+- Add evaluation for Q/A, including a small labelled set and a retrieval quality report.
+- Improve citations and UX, for example deep-linking to timestamps in a video player.
 
 Since this is an early stage project, the actual roadmap may change significantly as the codebase evolves.
